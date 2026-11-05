@@ -3260,13 +3260,27 @@ html.precise-open body {
 }
 .aforo-turno .field-row {
   gap: 10px;
+  margin-bottom: 14px;
+}
+.aforo-turno .field-row:last-child {
   margin-bottom: 0;
 }
-.aforo-turno .aforo-lote-valvula.field-row {
+.aforo-turno .aforo-lote-valvula.field-row,
+.aforo-turno .aforo-b1-b2.field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   align-items: stretch;
+}
+.aforo-turno .aforo-b1-b2.field-row {
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+.aforo-b1-b2 .field {
+  min-width: 0;
+  width: 100%;
+  flex: none;
+  margin-bottom: 0;
 }
 .aforo-lote-valvula .field {
   min-width: 0;

@@ -232,7 +232,7 @@ QB.App = (() => {
     confirmBusy_ = true;
     try {
       return await feedback({
-        title: "¿Salir de la evaluación?",
+        title: "¿Salir del registro?",
         text: "Los datos quedan en el celular hasta que pulses Guardar.",
         type: "warn",
         confirmText: "Salir",
@@ -377,6 +377,10 @@ QB.App = (() => {
   }
 
   function goHome() {
+    // Persistir antes de vaciar memoria (si se apaga / vuelve al inicio)
+    try {
+      if (state.type === "aforos") saveDraft_();
+    } catch (_) {}
     state.type = null;
     state.data = {};
     state.score = null;
@@ -561,15 +565,18 @@ QB.App = (() => {
     renderOpsPanel();
   }
 
+  let aforosDraftToastOnce_ = false;
   function ensureAforosInlineForm_() {
     state.type = "aforos";
     showScreen("home");
     if (!state.data || typeof state.data !== "object") state.data = {};
     const draft = loadDraft_("aforos");
+    let restored = false;
     if (draft && draft.data && !state.clientId) {
       state.data = { ...draft.data };
       state.score = draft.score || null;
       state.clientId = draft.clientId || null;
+      restored = true;
     }
     if (!state.data.fecha) state.data.fecha = todayISO();
     if (!state.data.fundo) state.data.fundo = "LICAPA";
@@ -580,7 +587,11 @@ QB.App = (() => {
     }
     if (!state.clientId) state.clientId = QB.API.newClientId();
     renderForm();
-    // Catálogos en segundo plano (lote / evaluador / supervisor)
+    if (restored && !aforosDraftToastOnce_) {
+      aforosDraftToastOnce_ = true;
+      toast("Borrador recuperado", "info");
+    }
+    // Catálogos en segundo plano (lote / regador)
     if (QB.Data && !QB.Data.isReady()) {
       QB.Data.load().then(() => {
         if (state.type === "aforos" && state.screen === "home") {
@@ -695,6 +706,7 @@ QB.App = (() => {
   }
 
   function openUploadsHistory() {
+    saveDraft_();
     state.uploadsPage = 0;
     renderUploadsHistory();
     showScreen("uploads");
@@ -746,7 +758,7 @@ QB.App = (() => {
     const canNative = !!deferredInstallPrompt;
 
     if (title) {
-      title.textContent = ios ? "Anclar a inicio" : "Instalar Q Calidad";
+      title.textContent = ios ? "Anclar a inicio" : "Instalar APP RIEGO";
     }
     if (text) {
       text.textContent = ios
@@ -992,8 +1004,8 @@ QB.App = (() => {
         text: "En el inicio pulsa Resumen para ver enviados y pendientes, 10 por página.",
       },
       una: {
-        title: "Una evaluación a la vez",
-        text: "Completa una, ve a Resumen, pulsa GUARDAR y recién ahí sigue con la siguiente. Así no se mezclan formularios ni borradores.",
+        title: "Un registro a la vez",
+        text: "Completa el aforo, ve a Resumen, pulsa GUARDAR y recién ahí sigue con el siguiente. Así no se mezclan formularios ni borradores.",
       },
       soporte: {
         title: "Soporte",
@@ -1488,6 +1500,9 @@ QB.App = (() => {
         </div>`;
     }
     if (opts.precise) {
+      if (name === "evaluador" || name === "supervisor" || name === "cosechador") {
+        shown = personDisplay(val) || opts.placeholder || "Seleccionar...";
+      }
       return `
         <div class="field" data-field="${name}">
           <label>${label}${req}</label>
@@ -1963,6 +1978,18 @@ QB.App = (() => {
         </div>
         ${fieldHtml("evaluador", "Regador", { precise: true, required: true, placeholder: "Seleccionar..." })}
       </div>
+      <div class="section-card">
+        <div class="section-head">
+          <div class="section-title">ETo</div>
+          <p class="section-sub">Un valor para el día · se aplica a todas las filas / turnos del registro.</p>
+        </div>
+        ${fieldHtml("eto", "ETo mm/día", {
+          type: "number",
+          step: "0.001",
+          inputmode: "decimal",
+          placeholder: "2.639",
+        })}
+      </div>
       <div class="section-card aforos-turnos-head">
         <div class="section-head">
           <div class="section-title">Turnos · aforo y drenaje</div>
@@ -2081,22 +2108,22 @@ QB.App = (() => {
           ${aforoPreciseHtml_(idx, "lote", "Lote", row.codLote || row.lote, loteShown, "Seleccionar...")}
           ${aforoPreciseHtml_(idx, "valvula", "Válvula", valvula, valvula, "Seleccionar...", VALVULA_ICON)}
         </div>
-        <div class="field-row">
-          <div class="field" data-field="aforo_${idx}">
-            <label>SFR / Aforo (ml)<span class="req">*</span></label>
-            <input type="text" inputmode="decimal" name="aforo_${idx}"
-              value="${escapeAttr(row.aforo ?? "")}" placeholder="4000" required />
-          </div>
+        <div class="field aforo-sfr-alone" data-field="aforo_${idx}">
+          <label>SFR / Aforo (ml)<span class="req">*</span></label>
+          <input type="text" inputmode="decimal" name="aforo_${idx}"
+            value="${escapeAttr(row.aforo ?? "")}" placeholder="4000" required />
+        </div>
+        <div class="field-row field-row-auto aforo-b1-b2">
           <div class="field" data-field="drenaje1_${idx}">
             <label>B1 (ml)<span class="req">*</span></label>
             <input type="text" inputmode="decimal" name="drenaje1_${idx}"
               value="${escapeAttr(row.drenaje1 ?? "")}" placeholder="2250" required />
           </div>
-        </div>
-        <div class="field" data-field="drenaje2_${idx}">
-          <label>B2 (ml)<span class="req">*</span></label>
-          <input type="text" inputmode="decimal" name="drenaje2_${idx}"
-            value="${escapeAttr(row.drenaje2 ?? "")}" placeholder="2500" required />
+          <div class="field" data-field="drenaje2_${idx}">
+            <label>B2 (ml)<span class="req">*</span></label>
+            <input type="text" inputmode="decimal" name="drenaje2_${idx}"
+              value="${escapeAttr(row.drenaje2 ?? "")}" placeholder="2500" required />
+          </div>
         </div>
       </div>`;
   }
@@ -2747,18 +2774,15 @@ QB.App = (() => {
         getOptions: (q) => filterCatalog(QB.CHECKLISTS?.incidencias?.implicaciones || [], q),
       },
       evaluador: {
-        title: "Elegir evaluador",
-        searchPlaceholder: "Buscar nombre o código…",
+        title: "Elegir regador",
+        searchPlaceholder: "Buscar nombre o DNI…",
         placeholder: "Seleccionar...",
         dynamic: true,
         minQuery: 0,
-        allowCustom: "person",
-        customKind: "evaluador",
-        buildCustomPerson,
+        allowCustom: false,
         getOptions: (q) => {
           if (!QB.Data) return [];
-          const list = QB.Data.evaluadorOptions(q) || [];
-          return list;
+          return QB.Data.evaluadorOptions(q) || [];
         },
         storeValue: personStore,
         resolveOption: personResolve,
@@ -2988,8 +3012,15 @@ QB.App = (() => {
     if (state.type === "aforos") {
       state.data = state.data || {};
       state.data.turnos = readAforosTurnosFromDom_();
-      const mod = $("#field-modulo")?.value;
-      if (mod != null) state.data.modulo = mod;
+      if (el.name === "eto" || el.name === "evaluador" || el.name === "lamina") {
+        state.data[el.name] = el.type === "number"
+          ? (el.value === "" ? "" : Number(el.value))
+          : String(el.value || "").trim();
+      }
+      if (el.name === "evaluador") {
+        const v = readPersonField_("evaluador");
+        if (v) state.data.evaluador = v;
+      }
       if (!state.data.ubicacion) state.data.ubicacion = "MEDIO";
     }
     saveDraft_();
@@ -3127,6 +3158,9 @@ QB.App = (() => {
     const metaRows = [
       d.evaluador
         ? [state.type === "aforos" ? "Regador" : "Evaluador", personDisplay(d.evaluador)]
+        : null,
+      state.type === "aforos" && d.eto !== "" && d.eto != null
+        ? ["ETo mm/día", String(d.eto) + " · todas las filas"]
         : null,
       usesIdentificacion_(state.type) && d.identificacion
         ? ["Identificación", d.identificacion]
@@ -3525,7 +3559,7 @@ QB.App = (() => {
     const saveBtn = $("#btn-save");
     if (saveBtn) saveBtn.disabled = true;
 
-    setLoading(true, "Guardando evaluación...");
+    setLoading(true, "Guardando registro...");
 
     function exitToHome() {
       clearEvalSession();
@@ -3661,7 +3695,10 @@ QB.App = (() => {
     $("#qb-sync")?.addEventListener("click", (e) => {
       if (e.target === $("#qb-sync")) closeSyncModal();
     });
-    $("#btn-back-uploads")?.addEventListener("click", goHome);
+    $("#btn-back-uploads")?.addEventListener("click", () => {
+      saveDraft_();
+      goHome();
+    });
     $("#uploads-prev")?.addEventListener("click", () => {
       if (state.uploadsPage > 0) {
         state.uploadsPage -= 1;
@@ -3814,7 +3851,21 @@ QB.App = (() => {
     }
     window.addEventListener("pagehide", saveDraft_);
     window.addEventListener("focus", refreshFechaIfNeeded);
-    window.addEventListener("pageshow", refreshFechaIfNeeded);
+    window.addEventListener("pageshow", (ev) => {
+      refreshFechaIfNeeded();
+      if (ev.persisted && isAforosOnly_()) {
+        saveDraft_();
+        renderHome();
+      }
+    });
+    // Autosave periódico: si el teléfono se apaga, el borrador ya está en localStorage
+    setInterval(() => {
+      try {
+        if (state.type === "aforos" && (state.screen === "home" || state.screen === "form" || state.screen === "resumen")) {
+          saveDraft_();
+        }
+      } catch (_) {}
+    }, 4000);
 
     updateStatusUI();
     renderOpsPanel();

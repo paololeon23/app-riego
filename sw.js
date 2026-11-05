@@ -1,5 +1,5 @@
-/* Q Berries Calidad — Service Worker · todo local en caché */
-const CACHE = "qb-calidad-v270";
+/* APP RIEGO — Service Worker · todo local en caché */
+const CACHE = "qb-riego-v278";
 const ASSETS = [
   "./",
   "./index.html",

@@ -3,10 +3,10 @@ window.QB = window.QB || {};
 
 QB.CONFIG = {
   /** Endpoint codificado (uso interno) */
-  _ep: "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4cnI3NGV4a2RnNUtQLURkR3FXWEpWMFNYUFdGOFlac3BDUXdIam4zX2NCQjJGTWk0eURPNTR6Ykk4bElmWS1qajkvZXhlYw==",
-  APP_NAME: "Q Berries · Aforos",
-  VERSION: "1.6.1",
-  /** Solo aforos en UI */
+  _ep: "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4TElkNDdpQUZ0ZGdJYkRKMkdneXR6YWw4bnp3Mng0WE1velRhMXhHSEtORGo4djFoZmhBQVNDRUM2bTBtWXN2cVUvZXhlYw==",
+  APP_NAME: "APP RIEGO",
+  VERSION: "1.6.8",
+  /** Solo aforos en UI — APP RIEGO */
   ACTIVE_EVALS: ["aforos"],
   /** URL pública HTTPS para QR / instalación Android */
   PUBLIC_URL: "https://calidad-qberries.netlify.app/install.html",
