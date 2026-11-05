@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content" />
+  <meta name="theme-color" content="#1F3D2A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Q Calidad" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Q Berries — Control de calidad en campo" />
+  <title>Q Berries · Aforos</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script>
+    /* Bloqueo inmediato: solo celular / tablet (sin flash de la app en PC) */
+    (function () {
+      function allowMobileOrTablet() {
+        var ua = navigator.userAgent || "";
+        var touch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet|Kindle|Silk/i.test(ua)) {
+          return true;
+        }
+        if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) return true;
+        var w = Math.min(window.innerWidth || 0, screen.width || 9999);
+        var h = Math.min(window.innerHeight || 0, screen.height || 9999);
+        var shortSide = Math.min(w, h);
+        var longSide = Math.max(w, h);
+        // Tablets táctiles sin UA “móvil”
+        if (touch && shortSide <= 900 && longSide <= 1400) return true;
+        return false;
+      }
+      if (!allowMobileOrTablet()) {
+        document.documentElement.classList.add("is-desktop");
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="desktop-gate" id="desktop-gate" aria-live="polite">
+    <div class="desktop-gate-bg" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+    </div>
+    <div class="desktop-gate-inner">
+      <img class="desktop-gate-logo" src="assets/logo-qberries.png" alt="Q Berries" width="88" height="88" />
+      <p class="desktop-gate-brand">Q BERRIES</p>
+      <h1>Solo en celular o tablet</h1>
+      <p class="desktop-gate-lead">Aforos y drenajes es para campo. En computadora no se puede usar.</p>
+      <div class="desktop-gate-devices" aria-hidden="true">
+        <span class="desktop-gate-device phone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          Celular
+        </span>
+        <span class="desktop-gate-device tablet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M11 17h2"/></svg>
+          Tablet
+        </span>
+      </div>
+      <p class="desktop-gate-hint">Abre el mismo enlace desde tu teléfono o tablet e instálala en la pantalla de inicio.</p>
+    </div>
+  </div>
+  <div class="qb-loader" id="qb-loader" hidden aria-live="polite">
+    <div class="qb-loader-card">
+      <span class="qb-spinner" aria-hidden="true"></span>
+      <p id="qb-loader-text">Guardando…</p>
+    </div>
+  </div>
+  <div class="qb-fb" id="qb-fb" hidden aria-live="polite">
+    <div class="qb-fb-sheet" role="dialog" aria-modal="true">
+      <div class="qb-fb-icon" id="qb-fb-icon" aria-hidden="true"></div>
+      <div class="qb-fb-copy">
+        <strong id="qb-fb-title"></strong>
+        <p id="qb-fb-text"></p>
+      </div>
+      <div class="qb-fb-actions" id="qb-fb-actions"></div>
+    </div>
+  </div>
+  <div class="qb-fb qb-sync-modal" id="qb-sync" hidden aria-live="polite">
+    <div class="qb-sync-sheet" role="dialog" aria-modal="true" aria-labelledby="qb-sync-title">
+      <div class="qb-sync-head">
+        <div>
+          <p class="qb-sync-kicker">Q Berries</p>
+          <h2 id="qb-sync-title">Sync seguro</h2>
+        </div>
+        <button type="button" class="qb-sync-close" id="qb-sync-close" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="qb-sync-version">
+        <span>Versión de la app</span>
+        <strong id="qb-sync-version">v1.6.1</strong>
+      </div>
+      <div class="qb-sync-actions">
+        <button type="button" class="qb-sync-btn primary" id="qb-sync-clear">
+          Eliminar caché
+          <small>Borra todo lo local · pendientes · borradores · deja la app limpia</small>
+        </button>
+        <button type="button" class="qb-sync-btn primary" id="qb-sync-update">
+          Actualizar app
+          <small>Descarga la última versión</small>
+        </button>
+        <button type="button" class="qb-sync-btn primary" id="qb-sync-transfer">
+          Modo transferencia
+          <small>Dos pasos · envía con la señal disponible</small>
+        </button>
+      </div>
+      <p class="qb-sync-tips-label">Recomendaciones de uso</p>
+      <div class="qb-sync-tips" id="qb-sync-tips">
+        <button type="button" class="qb-sync-tip" data-tip="offline">Sin red: guarda igual; se sincroniza al volver la señal</button>
+        <button type="button" class="qb-sync-tip" data-tip="resumen">Revisa «Resumen» para ver enviados y pendientes</button>
+        <button type="button" class="qb-sync-tip" data-tip="una">Una evaluación a la vez: GUARDAR y sigue con la siguiente</button>
+        <button type="button" class="qb-sync-tip" data-tip="soporte">¿Problemas con el app? Contacta a support — Paolo León</button>
+      </div>
+      <button type="button" class="qb-sync-done" id="qb-sync-done">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Modo transferencia: sync hasta 0 pendientes -->
+  <div class="qb-transfer" id="qb-transfer" hidden aria-live="polite">
+    <div class="qb-transfer-sheet" role="dialog" aria-modal="true" aria-labelledby="qb-transfer-title">
+      <div class="qb-transfer-spinner" aria-hidden="true"></div>
+      <h2 id="qb-transfer-title">Modo transferencia</h2>
+      <p class="qb-transfer-sub" id="qb-transfer-sub">Enviando pendientes… Deja la app abierta.</p>
+      <div class="qb-transfer-progress">
+        <div class="qb-transfer-bar"><span id="qb-transfer-fill"></span></div>
+        <p class="qb-transfer-count" id="qb-transfer-count">0 / 0</p>
+      </div>
+      <p class="qb-transfer-hint" id="qb-transfer-hint">No cierres ni bloquees el teléfono hasta terminar.</p>
+      <div class="qb-transfer-actions" id="qb-transfer-actions" hidden>
+        <button type="button" class="qb-fb-primary" id="qb-transfer-done">Listo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app">
+    <!-- HOME -->
+    <section class="screen active" id="screen-home">
+      <div class="home-atmosphere" aria-hidden="true">
+        <span class="orb orb-a"></span>
+        <span class="orb orb-b"></span>
+        <span class="orb orb-c"></span>
+      </div>
+
+      <header class="corp-header glass">
+        <div class="corp-left">
+          <img class="corp-logo" src="assets/logo-qberries.png" alt="Q Berries" width="56" height="56" draggable="false" />
+          <div class="corp-titles">
+            <div class="corp-brand">Q BERRIES</div>
+            <h1 class="corp-title">Aforos y drenajes</h1>
+            <p class="corp-sub">Registro directo de campo</p>
+          </div>
+        </div>
+        <div class="status-stack" data-status-bar>
+          <div class="status-chip online" id="chip-online" title="Estado de conexión">
+            <span class="dot"></span>
+            <span class="chip-text">En línea</span>
+          </div>
+          <button type="button" class="status-chip pending" id="chip-pending" title="Sincronizar pendientes">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+              <path d="M12 16V8M8 11l4-4 4 4"/>
+              <path d="M5 18h14a2 2 0 0 0 2-2v-1a4 4 0 0 0-3.2-3.9A6 6 0 0 0 6.1 9.2 4 4 0 0 0 5 13v3a2 2 0 0 0 2 2z" opacity=".35"/>
+            </svg>
+            <span class="chip-text" id="chip-pending-text">0 pend.</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="panel-scroll" id="home-scroll">
+      <div class="install-banner" id="install-banner" hidden>
+        <div class="install-banner-copy">
+          <strong id="install-banner-title">Instalar Q Calidad</strong>
+          <p id="install-banner-text">Agrégala a tu inicio para usarla como app en campo.</p>
+        </div>
+        <div class="install-banner-actions">
+          <button type="button" class="install-banner-btn" id="btn-install-app">Instalar</button>
+          <button type="button" class="install-banner-dismiss" id="btn-install-dismiss" aria-label="Cerrar">×</button>
+        </div>
+      </div>
+      <div class="home-hero spotlight">
+        <h2>Aforos y drenajes</h2>
+        <p>Completa los datos y los turnos del día</p>
+        <div class="hero-pills">
+          <span>Registro directo</span>
+          <button type="button" class="hero-pill-btn" id="btn-uploads">Resumen</button>
+          <button type="button" class="hero-pill-btn" id="btn-sync-info">Sync seguro</button>
+        </div>
+      </div>
+      <div class="eval-grid" id="eval-grid" hidden></div>
+      <div id="aforos-inline-root" class="home-aforos-form"></div>
+
+      <section class="ops-panel" id="ops-panel" aria-label="Resumen del día">
+        <div class="ops-head">
+          <div>
+            <p class="ops-kicker">Riego · campo</p>
+            <h3>Resumen del día</h3>
+          </div>
+          <span class="ops-date" id="ops-date"></span>
+        </div>
+        <div class="ops-metrics-row" id="ops-by-type" aria-label="Indicadores del día">
+          <div class="ops-metric ops-metric--primary">
+            <span class="ops-metric-val" id="kpi-hoy">0</span>
+            <span class="ops-metric-label">Registros hoy</span>
+          </div>
+          <div class="ops-metric" id="kpi-pend-wrap">
+            <span class="ops-metric-val" id="kpi-pend">0</span>
+            <span class="ops-metric-label">Pendientes</span>
+          </div>
+          <div class="ops-metric ops-type" data-type="aforos">
+            <span class="ops-metric-code">RG-01</span>
+            <span class="ops-metric-val" id="kpi-tipo-aforos">0</span>
+            <span class="ops-metric-label">Aforos</span>
+          </div>
+        </div>
+        <div class="ops-last" id="ops-last"></div>
+      </section>
+
+      </div>
+      <div class="form-actions" id="home-aforos-actions" hidden>
+        <button type="button" class="btn btn-ghost" id="btn-aforos-clear">Limpiar</button>
+        <button type="button" class="btn btn-primary" id="btn-aforos-review">Ver resumen</button>
+      </div>
+    </section>
+
+    <!-- FORM -->
+    <section class="screen" id="screen-form">
+      <header class="corp-header compact">
+        <button type="button" class="icon-btn" id="btn-back-form" aria-label="Volver">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="corp-titles grow">
+          <div class="corp-brand">Q BERRIES</div>
+          <h1 class="corp-title" id="form-title">—</h1>
+          <p class="corp-sub" id="form-desc">Nueva evaluación</p>
+        </div>
+        <div class="status-stack" data-status-bar>
+          <div class="status-chip online" data-chip-online>
+            <span class="dot"></span>
+            <span class="chip-text">En línea</span>
+          </div>
+          <button type="button" class="status-chip pending" data-chip-pending>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V8M8 11l4-4 4 4"/></svg>
+            <span class="chip-text" data-pending-text>0 pend.</span>
+          </button>
+        </div>
+      </header>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="panel-scroll form-body" id="form-root"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancel">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-review">Ver resumen</button>
+      </div>
+    </section>
+
+    <!-- RESUMEN -->
+    <section class="screen" id="screen-resumen">
+      <header class="corp-header compact">
+        <button type="button" class="icon-btn" id="btn-back-resumen" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="corp-titles grow">
+          <div class="corp-brand">Q BERRIES</div>
+          <h1 class="corp-title" id="resumen-title">Resumen</h1>
+          <p class="corp-sub" id="resumen-sub">Exportable campo</p>
+        </div>
+        <div class="status-stack" data-status-bar>
+          <div class="status-chip online" data-chip-online>
+            <span class="dot"></span>
+            <span class="chip-text">En línea</span>
+          </div>
+          <button type="button" class="status-chip pending" data-chip-pending>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V8M8 11l4-4 4 4"/></svg>
+            <span class="chip-text" data-pending-text>0 pend.</span>
+          </button>
+        </div>
+      </header>
+      <div class="panel-scroll resumen-wrap">
+        <div class="meta-list" id="resumen-meta"></div>
+        <div class="resumen-acciones" id="resumen-acciones" hidden></div>
+        <div class="table-card" id="resumen-table"></div>
+      </div>
+      <div class="form-actions dual">
+        <button type="button" class="btn btn-ghost" id="btn-edit">Editar</button>
+        <button type="button" class="btn btn-dark" id="btn-save">GUARDAR</button>
+      </div>
+    </section>
+
+    <!-- HISTORIAL SUBIDOS -->
+    <section class="screen" id="screen-uploads">
+      <header class="corp-header compact">
+        <button type="button" class="icon-btn" id="btn-back-uploads" aria-label="Volver">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="corp-titles grow">
+          <div class="corp-brand">Q BERRIES</div>
+          <h1 class="corp-title">Mis registros</h1>
+          <p class="corp-sub">Lo que has guardado</p>
+        </div>
+        <div class="status-stack" data-status-bar>
+          <div class="status-chip online" data-chip-online>
+            <span class="dot"></span>
+            <span class="chip-text">En línea</span>
+          </div>
+          <button type="button" class="status-chip pending" data-chip-pending>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V8M8 11l4-4 4 4"/></svg>
+            <span class="chip-text" data-pending-text>0 pend.</span>
+          </button>
+        </div>
+      </header>
+      <div class="panel-scroll uploads-wrap">
+        <p class="uploads-summary" id="uploads-summary"></p>
+        <div class="uploads-list" id="uploads-list"></div>
+        <nav class="uploads-pager" id="uploads-pager" aria-label="Paginación" hidden>
+          <button type="button" class="pager-btn" id="uploads-prev">Anterior</button>
+          <span class="pager-info" id="uploads-page-info">1 / 1</span>
+          <button type="button" class="pager-btn" id="uploads-next">Siguiente</button>
+        </nav>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/catalog-seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/valvular-data.js"></script>
+  <script src="js/aforos-parse.js"></script>
+  <script src="js/scoring.js"></script>
+  <script src="js/select.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

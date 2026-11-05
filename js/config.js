@@ -1,0 +1,525 @@
+/** Catálogos, umbrales y definición de evaluaciones — Q Berries */
+window.QB = window.QB || {};
+
+QB.CONFIG = {
+  /** Endpoint codificado (uso interno) */
+  _ep: "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4cnI3NGV4a2RnNUtQLURkR3FXWEpWMFNYUFdGOFlac3BDUXdIam4zX2NCQjJGTWk0eURPNTR6Ykk4bElmWS1qajkvZXhlYw==",
+  APP_NAME: "Q Berries · Aforos",
+  VERSION: "1.6.1",
+  /** Solo aforos en UI */
+  ACTIVE_EVALS: ["aforos"],
+  /** URL pública HTTPS para QR / instalación Android */
+  PUBLIC_URL: "https://calidad-qberries.netlify.app/install.html",
+};
+
+QB.CATALOG = {
+  variedades: [
+    { id: "S. Pop", label: "S. Pop", meta: "Variedad" },
+    { id: "Mágica", label: "Mágica", meta: "Variedad" },
+  ],
+};
+
+/** Defectos por formulario (conteos → %). Clave = id campo */
+QB.DEFECTS = {
+  calidad: [
+    { id: "blando", label: "Blando", grupo: "CON", thresholdKey: "blando" },
+    { id: "desgarro", label: "Desgarro", grupo: "CON", thresholdKey: "desgarro" },
+    { id: "deshidratado", label: "Deshidratado", grupo: "CON", thresholdKey: "deshidratado" },
+    { id: "rojizo", label: "Rojizo", grupo: "CAL", thresholdKey: "rojizo" },
+    { id: "resto_floral", label: "Resto floral", grupo: "CAL", thresholdKey: "resto_floral" },
+    { id: "polen", label: "Polen", grupo: "CAL", thresholdKey: "polen" },
+    { id: "pedicelo", label: "Pedicelo", grupo: "CAL", thresholdKey: "pedicelo" },
+    { id: "cicatriz", label: "Cicatriz", grupo: "CAL", thresholdKey: "cicatriz" },
+    { id: "polvo", label: "Polvo", grupo: "CAL", thresholdKey: "polvo" },
+    { id: "herida_abierta", label: "Herida abierta", grupo: "CON", thresholdKey: "herida_abierta" },
+    { id: "picadura_ave", label: "Picadura ave", grupo: "CON", thresholdKey: "picadura_ave" },
+    { id: "sin_bloom", label: "Sin Bloom", grupo: "CAL", thresholdKey: "sin_bloom" },
+    { id: "plagas_insectos", label: "Plagas e insectos", grupo: "CAL", thresholdKey: "plagas" },
+    { id: "insercion_pedicelar", label: "Inserción pedicelar", grupo: "CON", thresholdKey: "insercion_pedicelar" },
+    /* solo estos 2 nuevos */
+    { id: "dano_sol", label: "Quemadura de sol", grupo: "CON", thresholdKey: "dano_sol" },
+    { id: "deshidratado_rojizo", label: "Rojo deshidratado", grupo: "CON", thresholdKey: "deshidratado_rojizo" },
+  ],
+  descarte: [
+    { id: "fruta_buena", label: "Fruta buena", grupo: "CAL", thresholdKey: "fruta_buena", rateByCount: true },
+    { id: "deshidratada", label: "Deshidratada", grupo: "CAL", thresholdKey: "deshidratada" },
+    { id: "rojiza", label: "Rojiza", grupo: "CAL", thresholdKey: "rojiza" },
+    { id: "pedicelo", label: "Pedicelo", grupo: "CAL", thresholdKey: "pedicelo" },
+    { id: "resto_floral", label: "Resto floral", grupo: "CAL", thresholdKey: "resto_floral" },
+    { id: "cicatriz", label: "Cicatriz", grupo: "CAL", thresholdKey: "cicatriz" },
+    { id: "polvo", label: "Polvo", grupo: "CAL", thresholdKey: "polvo" },
+    { id: "desgarro", label: "Desgarro", grupo: "CAL", thresholdKey: "desgarro" },
+    { id: "picadura_ave", label: "Picadura ave", grupo: "CAL", thresholdKey: "picadura_ave" },
+    { id: "sin_bloom", label: "Sin Bloom", grupo: "CAL", thresholdKey: "sin_bloom" },
+    { id: "polen", label: "Polen", grupo: "CAL", thresholdKey: "polen" },
+    /* mismos 2 nuevos */
+    { id: "dano_sol", label: "Quemadura de sol", grupo: "CAL", thresholdKey: "dano_sol" },
+    { id: "deshidratado_rojizo", label: "Rojo deshidratado", grupo: "CAL", thresholdKey: "deshidratado_rojizo" },
+  ],
+};
+
+/**
+ * ═══════════════════════════════════════════════════════════
+ * LÓGICA EXACTA DE CALIFICACIÓN (Calidad + Descarte)
+ * ═══════════════════════════════════════════════════════════
+ * Base oficial: REF = 350 bayas (columnas AZUL de la tabla).
+ *
+ * 1) Entrada: conteo (N°) y tamaño de muestra (S)
+ * 2) Unidades equivalentes a 350:
+ *        u = conteo × (350 / S)
+ * 3) La calificación se decide SOLO con u vs bandas `unidades`
+ *    (Excelente / Bueno / Regular / Malo), rangos inclusivos.
+ * 4) El % guardado/mostrado es independiente:
+ *        % = (conteo / S) × 100
+ * 5) Los % de la matriz se DERIVAN de las unidades (no al revés):
+ *        %banda = redondeo1( uBanda × 100 / 350 )
+ *    Así unidades y % nunca se desincronizan.
+ *
+ * Solapes: Excelente↔Bueno → Excelente · Regular↔Malo → Malo.
+ * Huecos entre bandas → grado anterior (mejor), salvo flags.
+ * ═══════════════════════════════════════════════════════════
+ */
+QB.THRESHOLDS = {
+  REF_SAMPLE: 350,
+
+  /* ——— Calidad ——— */
+  // Falta de color
+  rojizo: {
+    unidades: { excelente: [0, 0], bueno: [1, 3], regular: [4, 5], malo: [6, 150] },
+    gapAsBueno: true,
+  },
+  rojiza: null,
+
+  // Pedúnculo adherido
+  pedicelo: {
+    unidades: { excelente: [0, 0], bueno: [1, 4.5], regular: [5, 7], malo: [8, 150] },
+    overlapWorst: true,
+    gapAsBueno: true,
+  },
+
+  // Restos florales
+  resto_floral: {
+    unidades: { excelente: [0, 0], bueno: [1, 4], regular: [4.5, 7], malo: [8, 150] },
+    overlapWorst: true,
+    gapAsBueno: true,
+  },
+
+  // Cicatrices / Polen / Russet (Exc hasta 3% → 10.5 und)
+  cicatriz: {
+    unidades: { excelente: [0, 10.5], bueno: [9, 13], regular: [14, 18], malo: [19, 150] },
+    overlapExcelenteWins: true,
+    overlapWorst: true,
+    gapAsBueno: true,
+  },
+  polen: null,
+  russet: null,
+
+  // Ausencia de bloom (Exc hasta 1% → 3.5 und)
+  sin_bloom: {
+    unidades: { excelente: [0, 3.5], bueno: [3, 6], regular: [7, 15], malo: [16, 150] },
+    overlapExcelenteWins: true,
+    gapAsBueno: true,
+  },
+
+  // Plagas: cualquier unidad > 0 = Malo
+  plagas: {
+    unidades: { excelente: [0, 0], bueno: [0, 0], regular: [0, 0], malo: [0.01, 150] },
+    zeroTolerance: true,
+  },
+  plagas_insectos: null,
+
+  // Pre calibre
+  pre_calibre: {
+    unidades: { excelente: [0, 0], bueno: [0, 5], regular: [6, 12], malo: [13, 150] },
+    gapAsBueno: true,
+  },
+
+  // Polvo: ≥5 und@350 = Malo
+  polvo: {
+    unidades: { excelente: [0, 0], bueno: [0, 0], regular: [0, 0], malo: [5, 150] },
+    zeroTolerance: true,
+  },
+
+  default_cal: null,
+  default: null,
+
+  /* ——— Condición ——— */
+  pudricion: {
+    unidades: { excelente: [0, 0], bueno: [0, 0], regular: [0, 1], malo: [1.5, 150] },
+    zeroTolerance: true,
+  },
+
+  picadura_ave: {
+    unidades: { excelente: [0, 0], bueno: [0, 0], regular: [1, 1], malo: [2, 150] },
+    gapAsBueno: false,
+  },
+
+  // Exc hasta 0.5% → 1.75 und
+  insercion_pedicelar: {
+    unidades: { excelente: [0, 1.75], bueno: [2, 4], regular: [5, 6], malo: [7, 150] },
+    gapAsBueno: true,
+  },
+
+  // Exc hasta 1.5% → 5.25 und
+  quemadura: {
+    unidades: { excelente: [0, 5.25], bueno: [6, 9], regular: [10, 15], malo: [16, 150] },
+    gapAsBueno: true,
+  },
+
+  blando: {
+    unidades: { excelente: [0, 0], bueno: [0, 0], regular: [1, 2], malo: [2, 150] },
+    overlapWorst: true,
+  },
+
+  // Deshidratación / Desgarro / Rojo deshidratado (Exc 0.8% → 2.8 und)
+  deshidratado: {
+    unidades: { excelente: [0, 2.8], bueno: [0, 2], regular: [3, 4], malo: [5, 150] },
+    overlapExcelenteWins: true,
+    gapAsBueno: true,
+  },
+  deshidratada: null,
+  desgarro: null,
+
+  // Herida abierta (Exc 0.5% → 1.75 und)
+  herida_abierta: {
+    unidades: { excelente: [0, 1.75], bueno: [1, 2], regular: [3, 4], malo: [5, 150] },
+    overlapExcelenteWins: true,
+    gapAsBueno: true,
+  },
+
+  // Quemadura de sol / Daño por sol
+  dano_sol: {
+    unidades: { excelente: [0, 1.75], bueno: [1.5, 2], regular: [3, 4], malo: [5, 150] },
+    overlapExcelenteWins: true,
+    gapAsBueno: true,
+  },
+
+  deshidratado_rojizo: {
+    unidades: { excelente: [0, 2.8], bueno: [0, 2], regular: [3, 4], malo: [5, 150] },
+    overlapExcelenteWins: true,
+    gapAsBueno: true,
+  },
+
+  /* Sumas globales siguen en % (no usan unidades 350) */
+  suma_cal: {
+    excelente: [0, 0],
+    bueno: [0.01, 12],
+    regular: [12, 20],
+    malo: [21, 50],
+    overlapBuenoWins: true,
+  },
+  suma_con: {
+    excelente: [0, 0],
+    bueno: [0.01, 2],
+    regular: [3, 5],
+    malo: [6, 50],
+    gapAsBueno: true,
+  },
+
+  pedicelo_count: { buenoMax: 4, regularMax: 7, byCount: true },
+  fruta_buena: { buenoMax: 4, regularMax: 7, byCount: true },
+  promedio_caida: { buenoMax: 2, regularMax: 4, byCount: true },
+  promedio_planta: { buenoMax: 2, regularMax: 4, byCount: true },
+};
+
+/** % = redondeo a 1 decimal de (unidades × 100 / 350) */
+function qbPctFromUnits_(u) {
+  const ref = Number(QB.THRESHOLDS.REF_SAMPLE) || 350;
+  const n = Number(u);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round((n * 10000) / ref) / 100; // 2 decimales exactos tipo 1.14; tabla usa ~1
+}
+
+function qbBandPctFromUnits_(band) {
+  if (!band || band.length < 2) return [0, 0];
+  return [qbPctFromUnits_(band[0]), qbPctFromUnits_(band[1])];
+}
+
+/** Rellena excelente/bueno/regular/malo (%) desde unidades — una sola fuente de verdad */
+(function qbSyncPctFromUnidades_() {
+  Object.keys(QB.THRESHOLDS).forEach((key) => {
+    const t = QB.THRESHOLDS[key];
+    if (!t || typeof t !== "object" || !t.unidades) return;
+    const U = t.unidades;
+    t.excelente = qbBandPctFromUnits_(U.excelente);
+    t.bueno = qbBandPctFromUnits_(U.bueno);
+    t.regular = qbBandPctFromUnits_(U.regular);
+    t.malo = qbBandPctFromUnits_(U.malo);
+  });
+})();
+
+[
+  ["rojiza", "rojizo"],
+  ["polen", "cicatriz"],
+  ["russet", "cicatriz"],
+  ["plagas_insectos", "plagas"],
+  ["desgarro", "deshidratado"],
+  ["deshidratada", "deshidratado"],
+  ["default_cal", "resto_floral"],
+  ["default", "resto_floral"],
+].forEach(([k, from]) => {
+  if (QB.THRESHOLDS[k] === null) QB.THRESHOLDS[k] = QB.THRESHOLDS[from];
+});
+
+QB.EVALS = {
+  calidad: {
+    id: "calidad",
+    title: "Evaluación de calidad",
+    short: "Cosechadores",
+    desc: "Control individual por cosechador",
+    sheet: "Calidad",
+    accent: "calidad",
+  },
+  descarte: {
+    id: "descarte",
+    title: "Evaluación de descarte",
+    short: "Descarte",
+    desc: "Clasificación de fruta descartada",
+    sheet: "Descarte",
+    accent: "descarte",
+  },
+  caida: {
+    id: "caida",
+    title: "Fruta caída",
+    short: "Caída",
+    desc: "Frutos caídos en campo",
+    sheet: "Fruta Caida",
+    accent: "caida",
+  },
+  planta: {
+    id: "planta",
+    title: "Fruta en planta",
+    short: "En planta",
+    desc: "Fruta dejada en la planta",
+    sheet: "Fruta Planta",
+    accent: "planta",
+  },
+  bpa: {
+    id: "bpa",
+    title: "Verificación de BPAS",
+    short: "BPAS",
+    desc: "Buenas prácticas agrícolas",
+    sheet: "BPAS",
+    accent: "bpa",
+    kind: "checklist",
+  },
+  inocuidad: {
+    id: "inocuidad",
+    title: "Verificación de inocuidad",
+    short: "Inocuidad",
+    desc: "Ambientes y transporte",
+    sheet: "Inocuidad",
+    accent: "inocuidad",
+    kind: "checklist",
+  },
+  incidencias: {
+    id: "incidencias",
+    title: "Incidencias y eventualidades",
+    short: "Incidencias",
+    desc: "Registro de incidencias de campo",
+    sheet: "Incidencias",
+    accent: "incidencias",
+    kind: "checklist",
+  },
+  calibres: {
+    id: "calibres",
+    title: "Evaluación de calibres",
+    short: "Calibres",
+    desc: "Distribución de calibres de la muestra",
+    sheet: "Calibres",
+    accent: "calibres",
+  },
+  campo: {
+    id: "campo",
+    title: "Verificación de campo",
+    short: "Campo",
+    desc: "Criterios de cosecha e hileras",
+    sheet: "Verificacion Campo",
+    accent: "campo",
+  },
+  aforos: {
+    id: "aforos",
+    title: "Aforos y drenajes",
+    short: "Aforos",
+    desc: "Registro por turno · SFR, B1 y B2",
+    sheet: "Aforos y Drenajes",
+    accent: "aforos",
+  },
+};
+
+/** Criterios Cumple / No cumple — Verificación de campo (VF-04) */
+QB.CAMPO_CRITERIOS = [
+  {
+    id: "animales",
+    label: "Ausencia de animales, materiales extraños y contaminantes químicos en las hileras",
+    short: "Animales / contaminantes",
+  },
+  {
+    id: "mallas",
+    label: "Mallas, estructuras, cerco y accesos en buen estado",
+    short: "Mallas / cercos / accesos",
+  },
+  {
+    id: "charcos",
+    label: "Ausencia de charcos de agua y acumulación de agua en hileras",
+    short: "Charcos / agua en hileras",
+  },
+  {
+    id: "lavamanos",
+    label: "Lavamanos instalados en casetas con insumos de alcohol, jabón y papel toalla",
+    short: "Lavamanos en casetas",
+  },
+  {
+    id: "hileras",
+    label: "Hileras limpias en buen estado",
+    short: "Hileras limpias",
+  },
+  {
+    id: "rocio",
+    label: "Ausencia de rocío en fruta o fruta mojada",
+    short: "Rocío / fruta mojada",
+  },
+  {
+    id: "macetas",
+    label: "Ausencia de macetas caídas",
+    short: "Macetas caídas",
+  },
+  {
+    id: "alergenos",
+    label: "Ausencia de alimentos alérgenos en las hileras",
+    short: "Alimentos alérgenos",
+  },
+  {
+    id: "personal_bpas",
+    label: "Personal cumple con BPAS",
+    short: "Personal BPAS",
+  },
+  {
+    id: "lavado_manos",
+    label: "Personal cumple con el lavado de manos antes de ingresar a cosecha",
+    short: "Lavado de manos",
+  },
+  {
+    id: "baldes",
+    label: "Baldes de lavamanos en buen estado",
+    short: "Baldes lavamanos",
+  },
+  {
+    id: "agua_lavamanos",
+    label: "Agua de lavamanos en buen estado",
+    short: "Agua lavamanos",
+  },
+  {
+    id: "jabas",
+    label: "Jabas y jarras en buen estado y limpias",
+    short: "Jabas y jarras",
+  },
+  {
+    id: "vehiculos",
+    label: "Vehículos de transporte de MP en buen estado y con ausencia de materiales extraños y olores",
+    short: "Vehículos MP",
+  },
+  {
+    id: "casetas",
+    label: "Casetas en buen estado (estructuras y limpieza)",
+    short: "Casetas",
+  },
+  {
+    id: "parihuelas",
+    label: "Parihuelas limpias (sin presencia de moho)",
+    short: "Parihuelas",
+  },
+];
+
+/** Rangos de calibre. % = N° del rango ÷ N° bayas totales × 100 */
+QB.CALIBRES = [
+  { id: "cal_lt12", label: "<12" },
+  { id: "cal_12_14", label: "12 a 14" },
+  { id: "cal_14_16", label: "14 a 16" },
+  { id: "cal_16_18", label: "16 a 18" },
+  { id: "cal_18_20", label: "18 a 20" },
+  { id: "cal_20_22", label: "20 a 22" },
+  { id: "cal_22_24", label: "22 a 24" },
+  { id: "cal_24mas", label: "24 a más" },
+];
+
+/** Listas fijas de cartillas (no mezclar entre evaluaciones) */
+QB.CHECKLISTS = {
+  bpa: {
+    areas: [
+      { id: "Cosecha", label: "Cosecha" },
+      { id: "Riego", label: "Riego" },
+      { id: "Proyecciones", label: "Proyecciones" },
+      { id: "Sanidad", label: "Sanidad" },
+    ],
+    incidencias: [
+      { id: "Uñas largas", label: "Uñas largas" },
+      { id: "Uñas pintadas", label: "Uñas pintadas" },
+      { id: "Presencia barbilla", label: "Presencia barbilla" },
+      { id: "Presencia de maquillaje", label: "Presencia de maquillaje" },
+      {
+        id: "Presencia de joyas: Aretes, pulseras y anillos",
+        label: "Presencia de joyas: Aretes, pulseras y anillos",
+      },
+      {
+        id: "Consumir alimentos dentro del cultivo",
+        label: "Consumir alimentos dentro del cultivo",
+      },
+      {
+        id: "Consumir golosinas dentro del cultivo",
+        label: "Consumir golosinas dentro del cultivo",
+      },
+      {
+        id: "Orinar ni defecar en los campos de cultivo",
+        label: "Orinar ni defecar en los campos de cultivo",
+      },
+      {
+        id: "Consumir frutas dentro del cultivo",
+        label: "Consumir frutas dentro del cultivo",
+      },
+      {
+        id: "Consumir bebidas azucaradas dentro del cultivo",
+        label: "Consumir bebidas azucaradas dentro del cultivo",
+      },
+      { id: "Ausencia de gorro", label: "Ausencia de gorro" },
+      { id: "Ausencia de polo manga larga", label: "Ausencia de polo manga larga" },
+      { id: "Usa pantalones inapropiados", label: "Usa pantalones inapropiados" },
+      { id: "Calzado inapropiado", label: "Calzado inapropiado" },
+      {
+        id: "Contaminación cruzada: Herida expuestas o fluidos corporales",
+        label: "Contaminación cruzada: Herida expuestas o fluidos corporales",
+      },
+    ],
+  },
+  inocuidad: {
+    zonas: [
+      { id: "Mini acopio", label: "Mini acopio" },
+      { id: "Zona de limpieza de jarras", label: "Zona de limpieza de jarras" },
+      { id: "Transportes (Kias)", label: "Transportes (Kias)" },
+    ],
+    verificaciones: [
+      { id: "Jarras", label: "Jarras" },
+      { id: "Jabas", label: "Jabas" },
+      { id: "Pisos", label: "Pisos" },
+      { id: "Parihuelas", label: "Parihuelas" },
+      { id: "Ambientes", label: "Ambientes" },
+      { id: "No aplica", label: "No aplica" },
+    ],
+    estados: [
+      { id: "Conforme", label: "Conforme" },
+      { id: "No conforme", label: "No conforme" },
+    ],
+  },
+  incidencias: {
+    areas: [
+      { id: "Cosecha", label: "Cosecha" },
+      { id: "Riego", label: "Riego" },
+      { id: "Sanidad", label: "Sanidad" },
+    ],
+    implicaciones: [
+      { id: "Materia Prima", label: "Materia Prima" },
+      { id: "Plantas", label: "Plantas" },
+      { id: "Personal", label: "Personal" },
+    ],
+  },
+};

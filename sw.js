@@ -1,0 +1,94 @@
+/* Q Berries Calidad — Service Worker · todo local en caché */
+const CACHE = "qb-calidad-v270";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./install.html",
+  "./css/fonts.css",
+  "./css/styles.css",
+  "./js/config.js",
+  "./js/catalog-seed.js",
+  "./js/data.js",
+  "./js/valvular-data.js",
+  "./js/aforos-parse.js",
+  "./js/scoring.js",
+  "./js/select.js",
+  "./js/api.js",
+  "./js/app.js",
+  "./manifest.json",
+  "./assets/logo-qberries.png",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/apple-touch-icon.png",
+  "./assets/qr-install.png",
+  "./data/lotes-licapa.json",
+  "./data/trabajadores.json",
+  "./data/supervisores-cosecha.json",
+  "./data/evaluadores.json",
+  "./fonts/plus-jakarta-sans-500.woff2",
+  "./fonts/plus-jakarta-sans-600.woff2",
+  "./fonts/plus-jakarta-sans-700.woff2",
+  "./fonts/plus-jakarta-sans-800.woff2",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+
+  // Solo mismo origen — Google Sheets POST no se cachea
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Caché primero (offline total). Si hay red, actualiza en segundo plano.
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      const fetched = fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => cached);
+      return cached || fetched;
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (let i = 0; i < clients.length; i++) {
+        const c = clients[i];
+        if ("focus" in c) return c.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow("./index.html");
+    })
+  );
+});
+
+/** Aviso a ventanas abiertas para vaciar cola (modo transferencia / red de seguridad) */
+self.addEventListener("sync", (event) => {
+  if (event.tag !== "qb-flush-pending") return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      clients.forEach((c) => c.postMessage({ type: "QB_FLUSH" }));
+    })
+  );
+});
