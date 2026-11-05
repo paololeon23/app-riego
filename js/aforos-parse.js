@@ -80,8 +80,8 @@ QB.AforosParse = (() => {
     const fecha = parseFechaToken(meta.fecha) || String(meta.fecha || "").trim();
     const anio = fecha ? Number(String(fecha).slice(0, 4)) : "";
     const semana = fecha ? isoWeek(fecha) : "";
-    const fundo = meta.fundo || "LICAPA";
-    const variedad = meta.variedad || "Mágica";
+    const fundo = meta.fundo || "";
+    const variedad = meta.variedad || "";
     const ubicacion = String(meta.ubicacion || "MEDIO").trim().toUpperCase() || "MEDIO";
     const eto = meta.eto !== "" && meta.eto != null ? Number(meta.eto) : "";
     const lamina = meta.lamina !== "" && meta.lamina != null ? Number(meta.lamina) : "";
@@ -107,24 +107,37 @@ QB.AforosParse = (() => {
       if (valvular === "" && QB.VALVULAR?.lookup) {
         valvular = QB.VALVULAR.lookup({ modulo, turno, lote: loteNum });
       }
-      // Variedad desde el lote seleccionado
-      let varRow = variedad;
+      // Separación interna: lote → Licapa I (Sekoya Pop) / Licapa II (Mágica)
       const L =
         QB.Data?.findLote && (t.codLote || loteNum)
           ? QB.Data.findLote(t.codLote || loteNum)
           : null;
+      let varRow = "";
       if (L?.variedad) {
         varRow = QB.Data.mapVariedad
           ? QB.Data.mapVariedad(L.variedad) || L.variedad
           : L.variedad;
+      } else if (variedad) {
+        varRow = variedad;
+      }
+      let fundoRow = "";
+      const kind = L?.etapa && QB.Data?.etapaKind ? QB.Data.etapaKind(L.etapa) : "";
+      if (kind === "I" || /pop/i.test(String(varRow))) {
+        fundoRow = "LICAPA I";
+        varRow = varRow || "S. Pop";
+      } else if (kind === "II" || /m[aá]gic/i.test(String(varRow))) {
+        fundoRow = "LICAPA II";
+        varRow = varRow || "Mágica";
+      } else if (fundo) {
+        fundoRow = fundo;
       }
       out.push({
         anio,
         fecha: fechaDisplay(fecha),
         fechaIso: fecha,
         semana,
-        fundo,
-        variedad: varRow || "Mágica",
+        fundo: fundoRow,
+        variedad: varRow || "",
         modulo,
         turno,
         valvular,

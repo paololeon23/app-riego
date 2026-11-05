@@ -5,8 +5,8 @@ QB.CONFIG = {
   /** Endpoint codificado (uso interno) */
   _ep: "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4TElkNDdpQUZ0ZGdJYkRKMkdneXR6YWw4bnp3Mng0WE1velRhMXhHSEtORGo4djFoZmhBQVNDRUM2bTBtWXN2cVUvZXhlYw==",
   APP_NAME: "APP RIEGO",
-  VERSION: "1.6.8",
-  /** Solo aforos en UI — APP RIEGO */
+  VERSION: "1.7.9",
+  /** Un solo formulario; Licapa I / II se separan al guardar en Sheets */
   ACTIVE_EVALS: ["aforos"],
   /** URL pública HTTPS para QR / instalación Android */
   PUBLIC_URL: "https://calidad-qberries.netlify.app/install.html",
@@ -342,7 +342,7 @@ QB.EVALS = {
     title: "Aforos y drenajes",
     short: "Aforos",
     desc: "Registro por turno · SFR, B1 y B2",
-    sheet: "Aforos y Drenajes",
+    sheet: "Licapa I - Sekoya Pop",
     accent: "aforos",
   },
 };

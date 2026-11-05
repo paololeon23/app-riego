@@ -89,59 +89,49 @@ QB.Data = (() => {
     return "";
   }
 
-  /** Un lote por número: si hay I+II → etiqueta Licapa I/II y datos de Licapa I */
+  /** Licapa I y Licapa II quedan separados (Sekoya Pop / Mágica). Sin fusión I/II. */
   function buildLoteCatalog(raw) {
     const all = Array.isArray(raw) ? raw : [];
-    const groups = new Map();
-    all.forEach((l) => {
-      const n = String(l.lote ?? "").trim();
-      if (!n) return;
-      if (!groups.has(n)) groups.set(n, []);
-      groups.get(n).push(l);
-    });
-
     lotesById = {};
     lotes = [];
 
     all.forEach((l) => {
-      const cod = String(l.codLote || "").trim();
-      if (cod) lotesById[cod] = l;
-    });
-
-    groups.forEach((group, num) => {
-      const licapaI = group.find((l) => etapaKind(l.etapa) === "I");
-      const licapaII = group.find((l) => etapaKind(l.etapa) === "II");
-      let pick;
-      let etapaLabel;
-      if (licapaI && licapaII) {
-        pick = licapaI;
-        etapaLabel = "Licapa I/II";
-      } else if (licapaI) {
-        pick = licapaI;
-        etapaLabel = "Licapa I";
-      } else if (licapaII) {
-        pick = licapaII;
-        etapaLabel = "Licapa II";
-      } else {
-        pick = group[0];
-        etapaLabel = String(pick.etapa || "").trim();
-      }
-      const entry = { ...pick, lote: num, etapa: etapaLabel };
+      const num = String(l.lote ?? "").trim();
+      if (!num) return;
+      const etapa = String(l.etapa || "").trim();
+      const kind = etapaKind(etapa);
+      const entry = { ...l, lote: num, etapa };
       lotes.push(entry);
-      lotesById[num] = entry;
-      lotesById[`Q${num}`] = entry;
-      if (pick.codLote) lotesById[String(pick.codLote)] = entry;
-      group.forEach((l) => {
-        const cod = String(l.codLote || "").trim();
-        if (cod) lotesById[cod] = entry;
-      });
+
+      const cod = String(l.codLote || "").trim();
+      if (cod) lotesById[cod] = entry;
+      if (kind) {
+        lotesById[`${num}|${kind}`] = entry;
+        lotesById[`Q${num}|${kind}`] = entry;
+      }
+      // Lookup por número: no pisar si ya hay otra etapa
+      if (!lotesById[num]) lotesById[num] = entry;
+      if (!lotesById[`Q${num}`]) lotesById[`Q${num}`] = entry;
     });
 
     lotes.sort((a, b) => {
-      const na = Number(a.lote) || 0;
-      const nb = Number(b.lote) || 0;
-      return na !== nb ? na - nb : String(a.etapa).localeCompare(String(b.etapa));
+      const na = Number(String(a.lote).replace(/\D/g, "")) || 0;
+      const nb = Number(String(b.lote).replace(/\D/g, "")) || 0;
+      if (na !== nb) return na - nb;
+      return String(a.etapa).localeCompare(String(b.etapa), "es");
     });
+  }
+
+  function etapaMatches_(loteEtapa, filterEtapa) {
+    const want = String(filterEtapa || "").trim();
+    if (!want) return true;
+    const a = etapaKind(loteEtapa);
+    const b = etapaKind(want);
+    if (a && b) return a === b;
+    return String(loteEtapa || "")
+      .trim()
+      .toUpperCase()
+      .includes(want.toUpperCase());
   }
 
   async function load() {
@@ -243,10 +233,12 @@ QB.Data = (() => {
   }
 
   /** Módulos únicos del catálogo (para cascada aforos) */
-  function moduloOptions(query) {
+  function moduloOptions(query, opts = {}) {
     const q = String(query || "").trim().toLowerCase();
+    const etapa = opts.etapa || "";
     const seen = new Map();
     for (const l of lotes) {
+      if (!etapaMatches_(l.etapa, etapa)) continue;
       const m = String(l.modulo || "").trim();
       if (!m || seen.has(m.toUpperCase())) continue;
       seen.set(m.toUpperCase(), { id: m, label: m, meta: "Módulo" });
@@ -264,11 +256,13 @@ QB.Data = (() => {
   }
 
   /** Turnos disponibles para un módulo */
-  function turnoOptions(modulo, query) {
+  function turnoOptions(modulo, query, opts = {}) {
     const mod = String(modulo || "").trim().toUpperCase();
     const q = String(query || "").trim().toLowerCase();
+    const etapa = opts.etapa || "";
     const seen = new Map();
     for (const l of lotes) {
+      if (!etapaMatches_(l.etapa, etapa)) continue;
       if (mod && String(l.modulo || "").trim().toUpperCase() !== mod) continue;
       const t = l.turno != null && l.turno !== "" ? String(l.turno) : "";
       if (!t || seen.has(t)) continue;
@@ -287,13 +281,14 @@ QB.Data = (() => {
     return list;
   }
 
-  /** Lotes filtrados por módulo y/o turno */
-  function loteOptionsFiltered({ modulo, turno, query } = {}) {
+  /** Lotes filtrados por módulo, turno y/o etapa (Licapa I / II) */
+  function loteOptionsFiltered({ modulo, turno, query, etapa } = {}) {
     const mod = String(modulo || "").trim().toUpperCase();
     const tur = String(turno || "").trim();
     const q = String(query || "").trim().toLowerCase();
     let list = lotes
       .filter((l) => {
+        if (!etapaMatches_(l.etapa, etapa)) return false;
         if (mod && String(l.modulo || "").trim().toUpperCase() !== mod) return false;
         if (tur && String(l.turno ?? "") !== tur) return false;
         return true;
@@ -301,7 +296,7 @@ QB.Data = (() => {
       .map((l) => ({
         id: String(l.codLote || l.lote),
         label: loteLabel(l),
-        meta: `${l.modulo || "—"} · Turno ${l.turno ?? "—"}`,
+        meta: `${l.etapa || "—"} · ${l.modulo || "—"} · Turno ${l.turno ?? "—"}`,
         raw: l,
       }));
     if (!q) return list.slice(0, 80);
@@ -324,40 +319,71 @@ QB.Data = (() => {
       .slice(0, 80);
   }
 
-  function findLote(id) {
+  function findLote(id, opts = {}) {
     const raw = String(id ?? "").trim();
     if (!raw) return null;
-    if (lotesById[raw]) return lotesById[raw];
+    const etapa = opts.etapa || "";
+    const kind = etapaKind(etapa);
+
+    if (kind) {
+      const keyed = lotesById[`${raw}|${kind}`] || lotesById[`Q${raw}|${kind}`];
+      if (keyed) return keyed;
+    }
+    if (lotesById[raw] && etapaMatches_(lotesById[raw].etapa, etapa)) {
+      return lotesById[raw];
+    }
 
     // "Lote 138 - Licapa I" | "Lote 138" | "Q138" | "138"
     const fromLabel = raw.match(/^lote\s*([^\s\-–—]+)/i);
-    if (fromLabel && lotesById[fromLabel[1]]) return lotesById[fromLabel[1]];
+    if (fromLabel) {
+      const hit = findLote(fromLabel[1], opts);
+      if (hit) return hit;
+    }
 
     const noPrefix = raw.replace(/^lote\s*/i, "").trim();
-    if (noPrefix && lotesById[noPrefix]) return lotesById[noPrefix];
+    if (noPrefix && noPrefix !== raw) {
+      const hit = findLote(noPrefix, opts);
+      if (hit) return hit;
+    }
 
     const qForm = noPrefix.replace(/^q/i, "").trim();
-    if (qForm && lotesById[qForm]) return lotesById[qForm];
-    if (qForm && lotesById[`Q${qForm}`]) return lotesById[`Q${qForm}`];
+    if (kind && qForm) {
+      const keyed = lotesById[`${qForm}|${kind}`] || lotesById[`Q${qForm}|${kind}`];
+      if (keyed) return keyed;
+    }
+    if (qForm && lotesById[qForm] && etapaMatches_(lotesById[qForm].etapa, etapa)) {
+      return lotesById[qForm];
+    }
+    if (qForm && lotesById[`Q${qForm}`] && etapaMatches_(lotesById[`Q${qForm}`].etapa, etapa)) {
+      return lotesById[`Q${qForm}`];
+    }
 
-    // codLote parcial: ...LT138
-    const lt = raw.match(/LT\s*(\d+)/i) || raw.match(/(?:^|[^\d])(\d{1,4})$/);
-    if (lt && lotesById[lt[1]]) return lotesById[lt[1]];
+    // Preferir codLote exacto
+    const byCod = lotes.find(
+      (l) =>
+        String(l.codLote || "") === raw && etapaMatches_(l.etapa, etapa)
+    );
+    if (byCod) return byCod;
 
     const digitsOnly = raw.replace(/\D/g, "");
-    if (digitsOnly && lotesById[digitsOnly]) return lotesById[digitsOnly];
+    if (kind && digitsOnly) {
+      const keyed = lotesById[`${digitsOnly}|${kind}`];
+      if (keyed) return keyed;
+    }
 
     const lower = raw.toLowerCase();
-    return (
-      lotes.find(
-        (l) =>
-          String(l.codLote || "") === raw ||
+    const match = lotes.find(
+      (l) =>
+        etapaMatches_(l.etapa, etapa) &&
+        (String(l.codLote || "") === raw ||
           String(l.lote) === raw ||
           String(l.lote) === digitsOnly ||
           loteLabel(l).toLowerCase() === lower ||
-          loteShortLabel(l).toLowerCase() === lower
-      ) || null
+          loteShortLabel(l).toLowerCase() === lower)
     );
+    if (match) return match;
+    if (etapa) return null;
+    return lotesById[raw] || lotesById[digitsOnly] || null;
   }
 
   /** Módulo + turno (+ etapa) siempre desde catálogo de lotes */
@@ -586,6 +612,7 @@ QB.Data = (() => {
     loteShortLabel,
     loteCount,
     mapVariedad,
+    etapaKind,
     shortName,
     personLabel,
     formatStoredPerson,

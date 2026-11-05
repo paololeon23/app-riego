@@ -11,8 +11,8 @@ QB.API = (() => {
   const IDB_NAME = "qb_calidad_db";
   const IDB_STORE = "queue";
   const IDB_VER = 2;
-  const HISTORY_TTL_MS = 12 * 60 * 60 * 1000; // 12 h — historial UI + cola crítica (antiguos no se borran)
-  const SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // sync automática de antiguos
+  const HISTORY_TTL_MS = 24 * 60 * 60 * 1000; // 24 h — historial UI se borra solo al vencer
+  const SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // sync automática de pendientes antiguos
   const LAST_SYNC_KEY = "qb_last_sync_at";
   const EVAL_TYPES = [
     "calidad",
@@ -25,6 +25,8 @@ QB.API = (() => {
     "calibres",
     "campo",
     "aforos",
+    "licapa_i",
+    "licapa_ii",
   ];
   const TZ_OPS = "America/Lima";
   const BATCH_SIZE = 4; // 3G: un grupo chico termina y se borra; 10 se queda esperando
@@ -701,17 +703,8 @@ QB.API = (() => {
     try {
       const raw = JSON.parse(localStorage.getItem(ACTIVITY_KEY) || "[]");
       if (!Array.isArray(raw) || !raw.length) return [];
-      const day = todayKey();
-      // Conservar: frescos (12 h) O del día operativo actual (KPI / historial del día)
-      const kept = raw.filter((a) => {
-        if (!a) return false;
-        if (isFresh_(a.at)) return true;
-        const ops =
-          a.fecha && /^\d{4}-\d{2}-\d{2}$/.test(String(a.fecha))
-            ? String(a.fecha)
-            : dayKeyLima_(a.at);
-        return ops === day;
-      });
+      // Solo últimas 24 h; el resto se borra solo
+      const kept = raw.filter((a) => a && isFresh_(a.at));
       if (kept.length !== raw.length) {
         localStorage.setItem(ACTIVITY_KEY, JSON.stringify(kept.slice(0, 200)));
         window.dispatchEvent(new Event("qb:activity"));
@@ -850,15 +843,7 @@ QB.API = (() => {
         list = id ? list.filter((a) => String(a.clientId || "") !== id) : list;
         list.unshift(entry);
       }
-      const day = todayKey();
-      const kept = list.filter((a) => {
-        if (isFresh_(a.at)) return true;
-        const ops =
-          a.fecha && /^\d{4}-\d{2}-\d{2}$/.test(String(a.fecha))
-            ? String(a.fecha)
-            : dayKeyLima_(a.at);
-        return ops === day;
-      });
+      const kept = list.filter((a) => a && isFresh_(a.at));
       localStorage.setItem(ACTIVITY_KEY, JSON.stringify(kept.slice(0, 200)));
       window.dispatchEvent(new Event("qb:activity"));
     } catch {
@@ -921,8 +906,8 @@ QB.API = (() => {
   }
 
   /**
-   * Historial UI: solo últimas 12 h.
-   * Pendientes antiguos permanecen en IDB (fuera del flujo crítico).
+   * Historial UI: solo últimas 24 h (se borra solo al vencer).
+   * Pendientes no enviados permanecen en IDB hasta sincronizar.
    */
   function getUploadHistory() {
     const seen = new Set();
@@ -1013,7 +998,8 @@ QB.API = (() => {
     pruneActivity_();
     try {
       if (window.__qbHistClean) clearInterval(window.__qbHistClean);
-      window.__qbHistClean = setInterval(pruneActivity_, 60 * 60 * 1000);
+      // Limpieza automática cada 15 min (historial > 24 h)
+      window.__qbHistClean = setInterval(pruneActivity_, 15 * 60 * 1000);
     } catch (_) {}
   }
 

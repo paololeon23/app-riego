@@ -1,5 +1,5 @@
 /* APP RIEGO — Service Worker · todo local en caché */
-const CACHE = "qb-riego-v278";
+const CACHE = "qb-riego-v290";
 const ASSETS = [
   "./",
   "./index.html",

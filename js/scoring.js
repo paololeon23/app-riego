@@ -514,7 +514,9 @@ QB.Scoring = (() => {
     }
     if (type === "calibres") return scoreCalibres(data);
     if (type === "campo") return scoreCampo(data);
-    if (type === "aforos") return scoreAforos(data);
+    if (type === "aforos" || type === "licapa_i" || type === "licapa_ii") {
+      return scoreAforos(data);
+    }
     return { rows: [], nota: 0, calidadGlobal: "Malo", explain: null };
   }
 

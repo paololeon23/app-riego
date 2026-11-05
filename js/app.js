@@ -31,14 +31,14 @@ QB.App = (() => {
 
   function saveDraft_() {
     try {
-      const onAforosHome = state.type === "aforos" && isAforosOnly_() && state.screen === "home";
+      const onAforosHome = isAforoType_(state.type) && isAforosOnly_() && state.screen === "home";
       if (!state.type || (state.screen !== "form" && state.screen !== "resumen" && !onAforosHome)) return;
       const liveRoot = getFormRoot_();
       const data =
         (state.screen === "form" || onAforosHome) && liveRoot
           ? { ...state.data, ...readFormSafe_() }
           : state.data || {};
-      if (state.type === "aforos" && liveRoot) {
+      if (isAforoType_(state.type) && liveRoot) {
         data.turnos = readAforosTurnosFromDom_();
       }
       const all = readAllDrafts_();
@@ -379,7 +379,7 @@ QB.App = (() => {
   function goHome() {
     // Persistir antes de vaciar memoria (si se apaga / vuelve al inicio)
     try {
-      if (state.type === "aforos") saveDraft_();
+      if (isAforoType_(state.type)) saveDraft_();
     } catch (_) {}
     state.type = null;
     state.data = {};
@@ -420,6 +420,12 @@ QB.App = (() => {
       if (type === "caida") {
         state.data.momento = "Después de cosecha";
       }
+      if (isAforoType_(type)) {
+        applyAforoDefaults_(state.data);
+        if (!Array.isArray(state.data.turnos) || !state.data.turnos.length) {
+          state.data.turnos = [emptyAforoTurno_()];
+        }
+      }
       if (!usesIdentificacion_(type)) delete state.data.identificacion;
       state.saving = false;
       if (QB.Data && !QB.Data.isReady()) {
@@ -444,7 +450,7 @@ QB.App = (() => {
         renderResumen();
         showScreen("resumen");
         $("#progress-fill") && ($("#progress-fill").style.width = "100%");
-      } else if (type === "aforos" && isAforosOnly_()) {
+      } else if (isAforoType_(type) && isAforosOnly_()) {
         showScreen("home");
         renderForm();
       } else {
@@ -472,6 +478,8 @@ QB.App = (() => {
     calibres: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="14" r="3"/><circle cx="15" cy="11" r="4"/><circle cx="16" cy="17" r="2.2"/></svg>`,
     campo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16"/><path d="M6 19V9l3-2 3 3 3-4 3 3v10"/><path d="M9 19v-5h3v5"/></svg>`,
     aforos: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h10v4H7z"/><path d="M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7"/><path d="M10 11h4M10 15h4"/></svg>`,
+    licapa_i: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h10v4H7z"/><path d="M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7"/><path d="M10 11h4M10 15h4"/></svg>`,
+    licapa_ii: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h10v4H7z"/><path d="M8 7v12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7"/><path d="M10 11h4M10 15h4"/></svg>`,
     chevron: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>`,
     back: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>`,
     caret: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>`,
@@ -490,6 +498,17 @@ QB.App = (() => {
     aforos: "RG-01 · Aforos",
   };
 
+  function isAforoType_(type) {
+    const t = type || state.type;
+    return t === "aforos" || t === "licapa_i" || t === "licapa_ii";
+  }
+
+  function applyAforoDefaults_(data) {
+    const d = data && typeof data === "object" ? data : {};
+    d.ubicacion = String(d.ubicacion || "MEDIO").trim().toUpperCase() || "MEDIO";
+    return d;
+  }
+
   function activeEvals_() {
     const ids = (QB.CONFIG && QB.CONFIG.ACTIVE_EVALS) || Object.keys(QB.EVALS || {});
     return ids.map((id) => QB.EVALS[id]).filter(Boolean);
@@ -497,11 +516,11 @@ QB.App = (() => {
 
   function isAforosOnly_() {
     const list = activeEvals_();
-    return list.length === 1 && list[0].id === "aforos";
+    return list.length === 1 && isAforoType_(list[0].id);
   }
 
   function getFormRoot_() {
-    if (state.type === "aforos" && isAforosOnly_() && $("#aforos-inline-root")) {
+    if (isAforoType_(state.type) && isAforosOnly_() && $("#aforos-inline-root")) {
       return $("#aforos-inline-root");
     }
     return $("#form-root");
@@ -579,9 +598,7 @@ QB.App = (() => {
       restored = true;
     }
     if (!state.data.fecha) state.data.fecha = todayISO();
-    if (!state.data.fundo) state.data.fundo = "LICAPA";
-    if (!state.data.variedad) state.data.variedad = "Mágica";
-    if (!state.data.ubicacion) state.data.ubicacion = "MEDIO";
+    applyAforoDefaults_(state.data);
     if (!Array.isArray(state.data.turnos) || !state.data.turnos.length) {
       state.data.turnos = [emptyAforoTurno_()];
     }
@@ -594,7 +611,7 @@ QB.App = (() => {
     // Catálogos en segundo plano (lote / regador)
     if (QB.Data && !QB.Data.isReady()) {
       QB.Data.load().then(() => {
-        if (state.type === "aforos" && state.screen === "home") {
+        if (isAforoType_(state.type) && state.screen === "home") {
           if (state.data.codLote || state.data.lote) applyLote({ id: state.data.codLote || state.data.lote });
         }
       }).catch(() => {});
@@ -1914,11 +1931,9 @@ QB.App = (() => {
             .join("")}
         </div>
       `;
-    } else if (state.type === "aforos") {
-      if (!state.data.fundo) state.data.fundo = "LICAPA";
-      if (!state.data.variedad) state.data.variedad = "Mágica";
-      if (!state.data.ubicacion) state.data.ubicacion = "MEDIO";
+    } else if (isAforoType_(state.type)) {
       if (!state.data.fecha) state.data.fecha = todayISO();
+      applyAforoDefaults_(state.data);
       if (!Array.isArray(state.data.turnos) || !state.data.turnos.length) {
         state.data.turnos = [emptyAforoTurno_()];
       }
@@ -1939,7 +1954,7 @@ QB.App = (() => {
         ${fieldHtml("identificacion", "Identificación", { type: "text", required: true, placeholder: "Escribir...", autocomplete: "off" })}
       `
           : ""
-      : state.type === "aforos"
+      : isAforoType_(state.type)
         ? ``
       : state.type === "calibres" || state.type === "campo"
         ? `
@@ -1968,8 +1983,8 @@ QB.App = (() => {
         </div>
       `;
 
-    if (state.type === "aforos") {
-      if (!state.data.ubicacion) state.data.ubicacion = "MEDIO";
+    if (isAforoType_(state.type)) {
+      applyAforoDefaults_(state.data);
       form.innerHTML = `
       <div class="section-card">
         <div class="section-head">
@@ -2294,7 +2309,7 @@ QB.App = (() => {
         return {
           id: String(l.codLote || l.lote),
           label: aforoLoteDisplay_(l, l.lote),
-          meta: `${l.modulo || "—"} · Turno ${l.turno ?? "—"}`,
+          meta: `${l.etapa || "—"} · ${l.modulo || "—"} · Turno ${l.turno ?? "—"}`,
           raw: l,
         };
       },
@@ -2413,7 +2428,7 @@ QB.App = (() => {
 
   function bindAforosTurnos_() {
     const root = getFormRoot_();
-    if (!root || state.type !== "aforos") return;
+    if (!root || !isAforoType_(state.type)) return;
     const addBtn = root.querySelector("#btn-add-turno") || $("#btn-add-turno");
     if (addBtn && !addBtn.dataset.qbBound) {
       addBtn.dataset.qbBound = "1";
@@ -2428,7 +2443,7 @@ QB.App = (() => {
       root.dataset.qbTurnosBound = "1";
       root.addEventListener("click", (ev) => {
         const btn = ev.target?.closest?.("[data-remove-turno]");
-        if (!btn || state.type !== "aforos") return;
+        if (!btn || !isAforoType_(state.type)) return;
         const idx = Number(btn.getAttribute("data-remove-turno"));
         state.data.turnos = readAforosTurnosFromDom_();
         if (state.data.turnos.length <= 1) {
@@ -2912,7 +2927,7 @@ QB.App = (() => {
       const base = ["fecha", "evaluador", "variedad", "lote", "modulo", "turno"];
       return base.concat((QB.CAMPO_CRITERIOS || []).map((c) => c.id));
     }
-    if (state.type === "aforos") {
+    if (isAforoType_(state.type)) {
       return ["evaluador"];
     }
     const required = ["fecha", "evaluador", "supervisor", "variedad", "lote", "modulo", "turno"];
@@ -3009,7 +3024,7 @@ QB.App = (() => {
       refreshFieldError("turno");
     }
     refreshDefectLiveRatings();
-    if (state.type === "aforos") {
+    if (isAforoType_(state.type)) {
       state.data = state.data || {};
       state.data.turnos = readAforosTurnosFromDom_();
       if (el.name === "eto" || el.name === "evaluador" || el.name === "lamina") {
@@ -3064,14 +3079,13 @@ QB.App = (() => {
     }
 
     let aforoToast = "";
-    if (ok && state.type === "aforos") {
+    if (ok && isAforoType_(state.type)) {
       const turnos = readAforosTurnosFromDom_();
       d.turnos = turnos;
       d.fecha = syncFechaHoy();
-      d.fundo = "LICAPA";
-      d.variedad = d.variedad || "Mágica";
-      d.ubicacion = String(d.ubicacion || "MEDIO").trim().toUpperCase() || "MEDIO";
+      applyAforoDefaults_(d);
       let rowsOk = true;
+      let volOk = true;
       for (let i = 0; i < turnos.length; i++) {
         const t = turnos[i] || {};
         const missing =
@@ -3091,11 +3105,39 @@ QB.App = (() => {
               if (field && isEmptyRequired(n, val)) field.classList.add("error");
             });
           }
+          continue;
+        }
+        // SFR / aforo siempre mayor que B1 y B2
+        const parseVol = QB.AforosParse?.parseVolume
+          ? QB.AforosParse.parseVolume.bind(QB.AforosParse)
+          : (raw) => {
+              const n = Number(String(raw || "").replace(/[^\d.]/g, ""));
+              return Number.isFinite(n) ? n : null;
+            };
+        const aforoMl = parseVol(t.aforo);
+        const b1Ml = parseVol(t.drenaje1);
+        const b2Ml = parseVol(t.drenaje2);
+        if (
+          aforoMl == null ||
+          b1Ml == null ||
+          b2Ml == null ||
+          !(aforoMl > b1Ml) ||
+          !(aforoMl > b2Ml)
+        ) {
+          volOk = false;
+          if (markFields && formRoot) {
+            ["aforo", "drenaje1", "drenaje2"].forEach((n) => {
+              formRoot.querySelector(`[data-field="${n}_${i}"]`)?.classList.add("error");
+            });
+          }
         }
       }
       if (!rowsOk) {
         ok = false;
         aforoToast = "Completa módulo, turno, lote, SFR, B1 y B2 en cada registro";
+      } else if (!volOk) {
+        ok = false;
+        aforoToast = "El aforo (SFR) debe ser mayor que B1 y mayor que B2";
       } else if (!QB.AforosParse) {
         ok = false;
         aforoToast = "Módulo de aforos no cargó";
@@ -3107,7 +3149,15 @@ QB.App = (() => {
           ok = false;
           aforoToast = "Completa al menos un registro con SFR, B1 y B2";
         } else {
-          d.aforo_rows = rows;
+          const badRow = rows.find(
+            (r) => !(Number(r.aforo) > Number(r.drenaje1)) || !(Number(r.aforo) > Number(r.drenaje2))
+          );
+          if (badRow) {
+            ok = false;
+            aforoToast = "El aforo (SFR) debe ser mayor que B1 y mayor que B2";
+          } else {
+            d.aforo_rows = rows;
+          }
         }
       }
     }
@@ -3116,7 +3166,7 @@ QB.App = (() => {
     if (!ok && showFeedback) {
       toast(aforoToast || "Completa los campos obligatorios", "error");
     }
-    return ok ? (state.type === "aforos" ? d : applyLoteMetaToData(d)) : null;
+    return ok ? (isAforoType_(state.type) ? d : applyLoteMetaToData(d)) : null;
   }
 
   let resumenBusy_ = false;
@@ -3126,13 +3176,13 @@ QB.App = (() => {
     try {
       syncFechaHoy();
       // Última pasada: si hay lote, forzar módulo/turno desde catálogo antes de validar
-      if (!isChecklistType_(state.type) && state.type !== "aforos") {
+      if (!isChecklistType_(state.type) && !isAforoType_(state.type)) {
         const loteVal = $("#field-lote")?.value || state.data?.codLote || state.data?.lote;
         if (loteVal) applyLote({ id: loteVal });
       }
       const data = validate(readForm(), { feedback: true, markFields: true });
       if (!data) return;
-      if (state.type !== "aforos") data.fecha = todayISO();
+      if (!isAforoType_(state.type)) data.fecha = todayISO();
       state.data = data;
       state.score = QB.Scoring.compute(state.type, data);
       if (!state.clientId) state.clientId = QB.API.newClientId();
@@ -3152,50 +3202,66 @@ QB.App = (() => {
     const d = state.data;
 
     $("#resumen-title").textContent = evalDef.title;
-    $("#resumen-sub").textContent = "Resumen · Exportable campo";
+    $("#resumen-sub").textContent = isAforoType_(state.type)
+      ? "Resumen formal · Aforos y drenajes"
+      : "Resumen · Exportable campo";
     updateStatusUI();
 
-    const metaRows = [
-      d.evaluador
-        ? [state.type === "aforos" ? "Regador" : "Evaluador", personDisplay(d.evaluador)]
-        : null,
-      state.type === "aforos" && d.eto !== "" && d.eto != null
-        ? ["ETo mm/día", String(d.eto) + " · todas las filas"]
-        : null,
-      usesIdentificacion_(state.type) && d.identificacion
-        ? ["Identificación", d.identificacion]
-        : null,
-      state.type !== "aforos" && d.supervisor ? ["Supervisor", personDisplay(d.supervisor)] : null,
-      d.cosechador ? ["Cosechador", personDisplay(d.cosechador)] : null,
-      ["Fecha y hora", nowStamp()],
-      state.type !== "aforos" && d.variedad ? ["Variedad", d.variedad] : null,
-      (d.lote || d.modulo || d.turno)
-        ? [
-            "Lote · Módulo · Turno",
-            [
-              QB.Data?.loteShortLabel?.(QB.Data.findLote(d.codLote || d.lote)) ||
-                (d.lote != null && d.lote !== "" ? `Lote ${d.lote}` : null),
-              d.modulo,
-              d.turno != null && d.turno !== "" ? `T${d.turno}` : null,
-            ]
-              .filter((x) => x != null && x !== "")
-              .join(" · "),
-          ]
-        : null,
-      d.momento ? ["Momento", d.momento] : null,
-      d.tamano_muestra != null && d.tamano_muestra !== ""
-        ? ["Tamaño muestra", d.tamano_muestra]
-        : null,
-      d.area ? ["Área", d.area] : null,
-      d.descripcion_incidencia ? ["Incidencia", d.descripcion_incidencia] : null,
-      d.zona ? ["Zona", d.zona] : null,
-      d.verificacion ? ["Verificación", d.verificacion] : null,
-      d.estado ? ["Estado", d.estado] : null,
-      d.implicacion ? ["Implicación", d.implicacion] : null,
-      state.type === "aforos" && d.aforo_rows
-        ? ["Registros", String(d.aforo_rows.length)]
-        : null,
-    ].filter(Boolean);
+    const splitRegadorUi_ = (raw) => {
+      const s = String(raw || "").trim();
+      const m = s.match(/^(\d{6,12})\s*[—\-–]\s*(.+)$/);
+      if (m) return { dni: m[1], nombre: String(m[2] || "").trim() };
+      if (/^\d{6,12}$/.test(s)) return { dni: s, nombre: "" };
+      return { dni: "", nombre: s };
+    };
+    const regUi = isAforoType_(state.type) ? splitRegadorUi_(d.evaluador) : null;
+
+    const metaRows = isAforoType_(state.type)
+      ? [
+          ["Hora de emisión", nowStamp()],
+          regUi?.dni ? ["DNI", regUi.dni] : null,
+          regUi?.nombre || d.evaluador
+            ? ["Regador", regUi?.nombre || personDisplay(d.evaluador)]
+            : null,
+          d.eto !== "" && d.eto != null
+            ? ["ETo mm/día", String(d.eto)]
+            : ["ETo mm/día", "Sin registrar"],
+          ["Ubicación", d.ubicacion || "MEDIO"],
+          ["Cantidad de registros", String((d.aforo_rows || []).length)],
+        ].filter(Boolean)
+      : [
+          d.evaluador ? ["Evaluador", personDisplay(d.evaluador)] : null,
+          usesIdentificacion_(state.type) && d.identificacion
+            ? ["Identificación", d.identificacion]
+            : null,
+          d.supervisor ? ["Supervisor", personDisplay(d.supervisor)] : null,
+          d.cosechador ? ["Cosechador", personDisplay(d.cosechador)] : null,
+          ["Fecha y hora", nowStamp()],
+          d.variedad ? ["Variedad", d.variedad] : null,
+          (d.lote || d.modulo || d.turno)
+            ? [
+                "Lote · Módulo · Turno",
+                [
+                  QB.Data?.loteShortLabel?.(QB.Data.findLote(d.codLote || d.lote)) ||
+                    (d.lote != null && d.lote !== "" ? `Lote ${d.lote}` : null),
+                  d.modulo,
+                  d.turno != null && d.turno !== "" ? `T${d.turno}` : null,
+                ]
+                  .filter((x) => x != null && x !== "")
+                  .join(" · "),
+              ]
+            : null,
+          d.momento ? ["Momento", d.momento] : null,
+          d.tamano_muestra != null && d.tamano_muestra !== ""
+            ? ["Tamaño muestra", d.tamano_muestra]
+            : null,
+          d.area ? ["Área", d.area] : null,
+          d.descripcion_incidencia ? ["Incidencia", d.descripcion_incidencia] : null,
+          d.zona ? ["Zona", d.zona] : null,
+          d.verificacion ? ["Verificación", d.verificacion] : null,
+          d.estado ? ["Estado", d.estado] : null,
+          d.implicacion ? ["Implicación", d.implicacion] : null,
+        ].filter(Boolean);
 
     $("#resumen-meta").innerHTML = metaRows
       .map(
@@ -3373,35 +3439,63 @@ QB.App = (() => {
       bindResumenAcc_();
       return;
     }
-    if (state.type === "aforos") {
+    if (isAforoType_(state.type)) {
       const rows = d.aforo_rows || [];
+      const fmtMl = (v) => {
+        if (v === "" || v == null || Number.isNaN(Number(v))) return "—";
+        return `${Number(v).toLocaleString("es-PE")} ml`;
+      };
+      const fmtPct = (v) => {
+        if (v === "" || v == null || Number.isNaN(Number(v))) return "—";
+        return `${Number(v)} %`;
+      };
       tableEl.hidden = false;
       tableEl.innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Módulo</th><th>Turno</th><th>Lote</th><th>Valvular</th>
-              <th>SFR</th><th>B1</th><th>B2</th><th>%</th><th>FORM.</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows
-              .map(
-                (r) => `<tr>
-                  <td>${escapeHtml(r.modulo)}</td>
-                  <td>${r.turno}</td>
-                  <td>${escapeHtml(r.lote || "—")}</td>
-                  <td>${r.valvular !== "" && r.valvular != null ? r.valvular : "—"}</td>
-                  <td>${r.aforo}</td>
-                  <td>${r.drenaje1}</td>
-                  <td>${r.drenaje2}</td>
-                  <td>${r.pctReal}%</td>
-                  <td>${escapeHtml(r.form)}</td>
-                </tr>`
-              )
-              .join("")}
-          </tbody>
-        </table>`;
+        <div class="aforo-resumen">
+          ${rows
+            .map((r, i) => {
+              const loteLabel =
+                QB.Data?.loteShortLabel?.(QB.Data.findLote(r.codLote || r.lote)) ||
+                (r.lote != null && r.lote !== "" ? String(r.lote) : "—");
+              const formTag = r.form || `T${r.turno} - ${r.modulo || ""}`;
+              return `
+              <section class="aforo-resumen-block" style="--i:${i}">
+                <div class="aforo-resumen-block-head">
+                  <span class="aforo-resumen-n">${String(i + 1).padStart(2, "0")}</span>
+                  <div class="aforo-resumen-block-titles">
+                    <span class="aforo-resumen-form">${escapeHtml(formTag)}</span>
+                    <span class="aforo-resumen-sub">${escapeHtml(r.fundo || "—")} · ${escapeHtml(r.variedad || "—")}</span>
+                  </div>
+                </div>
+                <dl class="aforo-resumen-dl">
+                  <div><dt>Módulo</dt><dd>${escapeHtml(r.modulo || "—")}</dd></div>
+                  <div><dt>Turno</dt><dd>${r.turno != null && r.turno !== "" ? `T${r.turno}` : "—"}</dd></div>
+                  <div><dt>Lote</dt><dd>${escapeHtml(loteLabel)}</dd></div>
+                  <div><dt>Válvula</dt><dd>${r.valvular !== "" && r.valvular != null ? escapeHtml(String(r.valvular)) : "—"}</dd></div>
+                  <div class="aforo-resumen-dl-wide"><dt>Ubicación</dt><dd>${escapeHtml(r.ubicacion || "MEDIO")}</dd></div>
+                </dl>
+                <div class="aforo-resumen-metrics">
+                  <div class="aforo-metric aforo-metric--sfr">
+                    <span class="aforo-metric-k">SFR / AFORO</span>
+                    <span class="aforo-metric-v">${fmtMl(r.aforo)}</span>
+                  </div>
+                  <div class="aforo-metric aforo-metric--b1">
+                    <span class="aforo-metric-k">B1</span>
+                    <span class="aforo-metric-v">${fmtMl(r.drenaje1)}</span>
+                  </div>
+                  <div class="aforo-metric aforo-metric--b2">
+                    <span class="aforo-metric-k">B2</span>
+                    <span class="aforo-metric-v">${fmtMl(r.drenaje2)}</span>
+                  </div>
+                  <div class="aforo-metric aforo-metric--pct">
+                    <span class="aforo-metric-k">% drenaje</span>
+                    <span class="aforo-metric-v">${fmtPct(r.pctReal)}</span>
+                  </div>
+                </div>
+              </section>`;
+            })
+            .join("")}
+        </div>`;
       return;
     }
     if (state.type === "campo") {
@@ -3538,13 +3632,13 @@ QB.App = (() => {
   async function save() {
     if (!state.score || !state.type || state.saving) return;
 
-    if (state.type !== "aforos") {
+    if (!isAforoType_(state.type)) {
       syncFechaHoy();
       if (state.data) state.data.fecha = todayISO();
     }
 
     const data = validate(
-      state.type === "aforos" ? { ...state.data, ...readForm() } : state.data,
+      isAforoType_(state.type) ? { ...state.data, ...readForm() } : state.data,
       { feedback: true, markFields: false }
     );
     if (!data) {
@@ -3656,13 +3750,11 @@ QB.App = (() => {
       const ok = await confirmCancel();
       if (!ok) return;
       clearDraft_("aforos");
-      state.data = {
+      state.type = "aforos";
+      state.data = applyAforoDefaults_({
         fecha: todayISO(),
-        fundo: "LICAPA",
-        variedad: "Mágica",
-        ubicacion: "MEDIO",
         turnos: [emptyAforoTurno_()],
-      };
+      });
       state.score = null;
       state.clientId = QB.API.newClientId();
       renderForm();
@@ -3861,7 +3953,7 @@ QB.App = (() => {
     // Autosave periódico: si el teléfono se apaga, el borrador ya está en localStorage
     setInterval(() => {
       try {
-        if (state.type === "aforos" && (state.screen === "home" || state.screen === "form" || state.screen === "resumen")) {
+        if (isAforoType_(state.type) && (state.screen === "home" || state.screen === "form" || state.screen === "resumen")) {
           saveDraft_();
         }
       } catch (_) {}

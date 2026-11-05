@@ -2586,6 +2586,14 @@ html.precise-open body {
   overflow: hidden;
   border: 1px solid var(--qb-line);
 }
+/* Aforos: sin caja exterior (evita doble borde con .aforo-resumen-block) */
+.table-card:has(.aforo-resumen) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+}
 .table-card table {
   width: 100%;
   border-collapse: collapse;
@@ -3351,13 +3359,185 @@ html.precise-open body {
   color: var(--qb-green);
 }
 
+/* Resumen formal aforos */
+@keyframes aforoResumenIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.aforo-resumen {
+  display: grid;
+  gap: 16px;
+  padding: 2px 0;
+}
+.aforo-resumen-block {
+  position: relative;
+  overflow: hidden;
+  padding: 14px;
+  border-radius: 16px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.96) 0%, rgba(234, 245, 236, 0.55) 100%),
+    repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 10px,
+      rgba(47, 143, 70, 0.025) 10px,
+      rgba(47, 143, 70, 0.025) 11px
+    );
+  border: 1px solid rgba(31, 61, 42, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 10px 28px rgba(31, 61, 42, 0.07);
+  animation: aforoResumenIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(0.06s * var(--i, 0));
+}
+.aforo-resumen-block-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.aforo-resumen-n {
+  min-width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #1F3D2A 0%, #2F8F46 100%);
+  color: #FFFFFF;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: 0 6px 14px rgba(47, 143, 70, 0.28);
+}
+.aforo-resumen-block-titles {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.aforo-resumen-form {
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: #15261C;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.aforo-resumen-sub {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--qb-green);
+  letter-spacing: 0.02em;
+}
+.aforo-resumen-dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+  margin: 0 0 14px;
+  padding: 2px 0 0;
+}
+.aforo-resumen-dl > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px dashed rgba(31, 61, 42, 0.12);
+}
+.aforo-resumen-dl-wide {
+  grid-column: 1 / -1;
+}
+.aforo-resumen-dl dt {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--qb-muted);
+}
+.aforo-resumen-dl dd {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #15261C;
+  text-align: right;
+}
+.aforo-resumen-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.aforo-metric {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 10px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(31, 61, 42, 0.08);
+}
+.aforo-metric-k {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--qb-muted);
+}
+.aforo-metric-v {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #15261C;
+  line-height: 1.1;
+  word-break: break-word;
+}
+.aforo-metric--sfr {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 14px 14px;
+}
+.aforo-metric--sfr .aforo-metric-k {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--qb-forest);
+}
+.aforo-metric--sfr .aforo-metric-v {
+  font-size: 1.2rem;
+  color: #15261C;
+  text-align: right;
+}
+.aforo-metric--b1,
+.aforo-metric--b2 {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5FAF6 100%);
+}
+.aforo-metric--pct {
+  background: linear-gradient(155deg, #FFF6E5 0%, #FFE9BF 100%);
+  border-color: rgba(247, 148, 29, 0.35);
+}
+.aforo-metric--pct .aforo-metric-k {
+  color: #9A5A00;
+}
+.aforo-metric--pct .aforo-metric-v {
+  color: #8A4E00;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-atmosphere .orb,
   .live-dot,
   .status-chip.online .dot,
   .eval-card,
   .home-hero.spotlight,
-  .screen.active {
+  .screen.active,
+  .aforo-resumen-block {
     animation: none !important;
   }
   .eval-card::after { display: none; }

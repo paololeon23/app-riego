@@ -1,6 +1,8 @@
 /**
  * APP RIEGO — Google Apps Script
- * Solo hoja: "Aforos y Drenajes"
+ * Hojas separadas:
+ *   - "Licapa I - Sekoya Pop"
+ *   - "Licapa II - Mágica"
  * ------------------------------------------------------------
  * SETUP:
  * 1) Pegar este archivo en el Apps Script del Sheet
@@ -8,14 +10,16 @@
  * 3) Implementar → Web App → URL …/exec → js/config.js
  */
 
-var AFOROS_SHEET = 'Aforos y Drenajes';
+var SHEET_LICAPA_I = 'Licapa I - Sekoya Pop';
+var SHEET_LICAPA_II = 'Licapa II - Mágica';
+var AFOROS_SHEET = SHEET_LICAPA_II; // compat ping
 
 var AFOROS_HEADERS = [
   'AÑO', 'FECHA', 'SEMANA', 'FUNDO', 'VARIEDAD', 'MÓDULO', 'TURNO', 'VALVULAR',
   'UBICACIÓN', 'ETo mm/día', 'LAMINA (mm)', 'REPOSICION mm',
   'CANTIDAD DRENAJE 1', 'CANTIDAD DRENAJE 2', 'CANTIDAD AFORO',
   '% DRENAJE REAL', '%MINIMO', '%MAXIMO', 'STATUS', 'FORM.',
-  'HORA GUARDADA'
+  'HORA GUARDADA', 'DNI', 'REGADOR'
 ];
 
 var AFORO_COLORS = {
@@ -151,23 +155,56 @@ function ensureAforosHeaders_(sheet) {
   styleAforoHeader_(sheet);
 }
 
-/** Solo usa / prepara la hoja Aforos y Drenajes. No crea otras hojas. */
-function getAforosSheet_(ss) {
-  var sheet = ss.getSheetByName(AFOROS_SHEET);
-  if (!sheet) throw new Error('No existe la hoja "' + AFOROS_SHEET + '"');
+/** Clasifica una fila → hoja Licapa I (Sekoya Pop) o Licapa II (Mágica) */
+function classifyAforoRowSheet_(row) {
+  row = row || {};
+  var fundo = String(row.fundo || '').trim().toUpperCase();
+  var variedad = String(row.variedad || '').trim().toUpperCase();
+  if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
+  if (fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
+  if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
+  if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
+  return '';
+}
+
+function resolveAforoSheetName_(data, typeOrSheet) {
+  var raw = String(typeOrSheet || '').trim();
+  var t = raw.toLowerCase();
+  if (t === 'licapa_i' || raw === SHEET_LICAPA_I) return SHEET_LICAPA_I;
+  if (t === 'licapa_ii' || raw === SHEET_LICAPA_II) return SHEET_LICAPA_II;
+  if (/licapa\s*ii/i.test(raw)) return SHEET_LICAPA_II;
+  if (/licapa\s*i\b/i.test(raw)) return SHEET_LICAPA_I;
+
+  var fundo = String((data && data.fundo) || '').trim().toUpperCase();
+  var variedad = String((data && data.variedad) || '').trim().toUpperCase();
+  if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
+  if (fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
+  if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
+  if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
+
+  var rows = data && data.aforo_rows;
+  if (rows && rows.length) {
+    var sheet0 = classifyAforoRowSheet_(rows[0]);
+    if (sheet0) return sheet0;
+  }
+  return '';
+}
+
+function getOrCreateAforoSheet_(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, AFOROS_HEADERS.length).setValues([AFOROS_HEADERS]);
+  }
   ensureAforosHeaders_(sheet);
   return sheet;
 }
 
-/** Manual: solo encabezados de Aforos y Drenajes */
+/** Manual: crea / prepara Licapa I y Licapa II */
 function setupAforos() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(AFOROS_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(AFOROS_SHEET);
-    sheet.getRange(1, 1, 1, AFOROS_HEADERS.length).setValues([AFOROS_HEADERS]);
-  }
-  ensureAforosHeaders_(sheet);
+  getOrCreateAforoSheet_(ss, SHEET_LICAPA_I);
+  getOrCreateAforoSheet_(ss, SHEET_LICAPA_II);
 }
 
 function formatHoraGuardada_(value) {
@@ -176,9 +213,28 @@ function formatHoraGuardada_(value) {
   return Utilities.formatDate(date, 'America/Lima', 'hh:mm:ss a');
 }
 
+/** Separar "41613772 — NOMBRE" → { dni, nombre } */
+function splitRegador_(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return { dni: '', nombre: '' };
+  var m = s.match(/^(\d{6,12})\s*[—\-–]\s*(.+)$/);
+  if (m) return { dni: String(m[1]), nombre: String(m[2] || '').trim() };
+  if (/^\d{6,12}$/.test(s)) return { dni: s, nombre: '' };
+  return { dni: '', nombre: s };
+}
+
 function buildAforoMatrix_(data, fechaISO, horaGuardada) {
   var list = data && data.aforo_rows;
   if (!list || !list.length) throw new Error('Sin filas de aforo (aforo_rows)');
+  for (var vi = 0; vi < list.length; vi++) {
+    var vr = list[vi] || {};
+    var va = Number(vr.aforo) || 0;
+    var vb1 = Number(vr.drenaje1) || 0;
+    var vb2 = Number(vr.drenaje2) || 0;
+    if (!(va > vb1) || !(va > vb2)) {
+      throw new Error('El aforo (SFR) debe ser mayor que B1 y mayor que B2');
+    }
+  }
   var headers = AFOROS_HEADERS;
   var iso = String(fechaISO || '').trim();
   var anioAuto = iso ? Number(iso.slice(0, 4)) : new Date().getFullYear();
@@ -188,6 +244,7 @@ function buildAforoMatrix_(data, fechaISO, horaGuardada) {
     semanaAuto = isoWeekAforo_(Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd'));
   }
   var hora = horaGuardada || formatHoraGuardada_(new Date());
+  var reg = splitRegador_(data.evaluador || data.regador || '');
   // ETo / lámina: un valor del formulario → se copia a TODAS las filas
   var etoGlobal = data.eto !== '' && data.eto != null ? data.eto : '';
   var laminaGlobal = data.lamina !== '' && data.lamina != null ? data.lamina : '';
@@ -207,12 +264,13 @@ function buildAforoMatrix_(data, fechaISO, horaGuardada) {
       : (r.valvular !== '' && r.valvular != null
         ? r.valvular
         : lookupValvular_(modulo, turno, r.lote || r.codLote));
-    var variedad = r.variedad || data.variedad || 'Mágica';
+    var variedad = r.variedad || data.variedad || '';
+    var fundo = r.fundo || data.fundo || '';
     var rowMap = {
       'AÑO': anioAuto,
       'FECHA': fechaAuto,
       'SEMANA': semanaAuto,
-      'FUNDO': r.fundo || data.fundo || 'LICAPA',
+      'FUNDO': fundo,
       'VARIEDAD': variedad,
       'MÓDULO': modulo,
       'TURNO': turno,
@@ -229,7 +287,9 @@ function buildAforoMatrix_(data, fechaISO, horaGuardada) {
       '%MAXIMO': 0.3,
       'STATUS': '',
       'FORM.': '',
-      'HORA GUARDADA': hora
+      'HORA GUARDADA': hora,
+      'DNI': reg.dni,
+      'REGADOR': reg.nombre
     };
     matrix.push(headers.map(function (h) {
       return rowMap.hasOwnProperty(h) ? rowMap[h] : '';
@@ -356,29 +416,108 @@ function canonFechaSave_(rawFecha, submittedAt) {
   return Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd');
 }
 
-function appendAforos_(ss, body, clientId, stamp) {
-  var sheet = getAforosSheet_(ss);
-  var data = body.data || {};
-  var fechaISO = canonFechaSave_(data.fecha, body.submittedAt || stamp) ||
-    Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd');
-  data.fecha = fechaISO;
-  if (!data.fundo) data.fundo = 'LICAPA';
-  if (!data.variedad) data.variedad = 'Mágica';
-  if (!data.ubicacion) data.ubicacion = 'MEDIO';
-  var hora = formatHoraGuardada_(body.submittedAt || stamp);
-  var matrix = buildAforoMatrix_(data, fechaISO, hora);
+function normalizeAforoType_(type) {
+  var t = String(type || '').trim().toLowerCase();
+  if (t === 'aforos' || t === 'licapa_i' || t === 'licapa_ii') return t;
+  return '';
+}
+
+function enrichAforoRowsFundo_(rows) {
+  var list = rows || [];
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i] || {};
+    var sheet = classifyAforoRowSheet_(r);
+    if (sheet === SHEET_LICAPA_I) {
+      r.fundo = 'LICAPA I';
+      if (!r.variedad) r.variedad = 'S. Pop';
+    } else if (sheet === SHEET_LICAPA_II) {
+      r.fundo = 'LICAPA II';
+      if (!r.variedad) r.variedad = 'Mágica';
+    }
+    list[i] = r;
+  }
+  return list;
+}
+
+function writeAforoMatrixToSheet_(sheet, matrix) {
+  if (!matrix || !matrix.length) return { row: 0, rowsWritten: 0 };
   var startRow = Math.max(sheet.getLastRow() + 1, 2);
   sheet.getRange(startRow, 1, matrix.length, AFOROS_HEADERS.length).setValues(matrix);
   applyAforoFormulas_(sheet, startRow, matrix.length);
   styleAforoRows_(sheet, startRow, matrix.length);
+  return { row: startRow, rowsWritten: matrix.length };
+}
+
+function appendAforos_(ss, body, clientId, stamp) {
+  var data = body.data || {};
+  var type = normalizeAforoType_(body.type);
+  var fechaISO = canonFechaSave_(data.fecha, body.submittedAt || stamp) ||
+    Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd');
+  data.fecha = fechaISO;
+  if (!data.ubicacion) data.ubicacion = 'MEDIO';
+  data.aforo_rows = enrichAforoRowsFundo_(data.aforo_rows || []);
+
+  var hora = formatHoraGuardada_(body.submittedAt || stamp);
+  var rowsI = [];
+  var rowsII = [];
+  var list = data.aforo_rows;
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i] || {};
+    var dest = classifyAforoRowSheet_(r);
+    if (!dest && type === 'licapa_i') dest = SHEET_LICAPA_I;
+    if (!dest && type === 'licapa_ii') dest = SHEET_LICAPA_II;
+    if (dest === SHEET_LICAPA_I) rowsI.push(r);
+    else if (dest === SHEET_LICAPA_II) rowsII.push(r);
+    else {
+      // fallback: variedad/fundo globales del payload
+      var fallback = resolveAforoSheetName_(data, type || body.sheet);
+      if (fallback === SHEET_LICAPA_I) rowsI.push(r);
+      else if (fallback === SHEET_LICAPA_II) rowsII.push(r);
+      else throw new Error('No se pudo clasificar fila (Licapa I / Licapa II)');
+    }
+  }
+  if (!rowsI.length && !rowsII.length) throw new Error('Sin filas de aforo (aforo_rows)');
+
+  var sheetsWritten = [];
+  var totalRows = 0;
+  var firstRow = 0;
+
+  if (rowsI.length) {
+    var dataI = Object.assign({}, data, {
+      fundo: 'LICAPA I',
+      variedad: 'S. Pop',
+      aforo_rows: rowsI
+    });
+    var sheetI = getOrCreateAforoSheet_(ss, SHEET_LICAPA_I);
+    var matrixI = buildAforoMatrix_(dataI, fechaISO, hora);
+    var wI = writeAforoMatrixToSheet_(sheetI, matrixI);
+    sheetsWritten.push(SHEET_LICAPA_I);
+    totalRows += wI.rowsWritten;
+    if (!firstRow) firstRow = wI.row;
+  }
+  if (rowsII.length) {
+    var dataII = Object.assign({}, data, {
+      fundo: 'LICAPA II',
+      variedad: 'Mágica',
+      aforo_rows: rowsII
+    });
+    var sheetII = getOrCreateAforoSheet_(ss, SHEET_LICAPA_II);
+    var matrixII = buildAforoMatrix_(dataII, fechaISO, hora);
+    var wII = writeAforoMatrixToSheet_(sheetII, matrixII);
+    sheetsWritten.push(SHEET_LICAPA_II);
+    totalRows += wII.rowsWritten;
+    if (!firstRow) firstRow = wII.row;
+  }
+
   markClientIdDone_(clientId);
   return {
     ok: true,
     created: true,
     duplicate: false,
-    sheet: AFOROS_SHEET,
-    row: startRow,
-    rowsWritten: matrix.length,
+    sheet: sheetsWritten.join(' + '),
+    sheets: sheetsWritten,
+    row: firstRow,
+    rowsWritten: totalRows,
     clientId: clientId,
     fecha: fechaISO
   };
@@ -386,8 +525,8 @@ function appendAforos_(ss, body, clientId, stamp) {
 
 function appendOneEvaluation_(ss, body) {
   body = body || {};
-  var type = body.type;
-  if (type !== 'aforos') throw new Error('Solo se acepta type=aforos');
+  var type = normalizeAforoType_(body.type);
+  if (!type) throw new Error('Solo se acepta type=aforos');
 
   var clientId = String(body.clientId || '').trim();
   if (!clientId) throw new Error('Falta clientId (idempotencia)');
@@ -445,7 +584,7 @@ function saveBatch_(body) {
         byCid[cid] = { clientId: cid, ok: true, created: false, duplicate: true };
         continue;
       }
-      if (rec.type !== 'aforos') {
+      if (!normalizeAforoType_(rec.type)) {
         byCid[cid] = { clientId: cid, ok: false, error: 'Solo se acepta type=aforos' };
         continue;
       }
@@ -480,12 +619,12 @@ function doGet(e) {
     return json_({
       ok: true,
       api: 'riego',
-      version: '1.0.0',
-      sheet: AFOROS_SHEET,
+      version: '1.1.0',
+      sheets: [SHEET_LICAPA_I, SHEET_LICAPA_II],
       ts: nowIso_()
     });
   }
-  return json_({ ok: true, api: 'riego', sheet: AFOROS_SHEET });
+  return json_({ ok: true, api: 'riego', sheets: [SHEET_LICAPA_I, SHEET_LICAPA_II] });
 }
 
 function doPost(e) {
@@ -557,6 +696,6 @@ function nowIso_() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('APP RIEGO')
-    .addItem('Preparar hoja Aforos y Drenajes', 'setupAforos')
+    .addItem('Preparar hojas Licapa I / Licapa II', 'setupAforos')
     .addToUi();
 }
