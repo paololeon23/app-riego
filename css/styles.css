@@ -1302,15 +1302,14 @@ body.is-desktop .qb-toast-stack {
 .ops-last-score {
   flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
   gap: 3px;
-  width: 70px;
-  min-width: 70px;
-  max-width: 70px;
-  padding: 5px 5px;
+  width: 78px;
+  min-width: 78px;
+  max-width: 86px;
+  padding: 5px 4px;
   overflow: visible;
   border-radius: 10px;
   background: var(--qb-mint);
@@ -1318,31 +1317,20 @@ body.is-desktop .qb-toast-stack {
   text-align: center;
   box-sizing: border-box;
 }
-.ops-last-score .big {
-  flex: 0 0 100%;
-  width: 100%;
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--qb-forest);
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-  margin-bottom: 1px;
-}
 .ops-last-score .sm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  padding: 1px 4px;
-  border-radius: 999px;
-  font-size: 0.58rem;
+  display: block;
+  width: 100%;
+  padding: 2px 3px;
+  border-radius: 6px;
+  font-size: 0.56rem;
   font-weight: 700;
   color: var(--qb-forest);
   background: #fff;
   border: 1px solid #D5E8D8;
-  line-height: 1.2;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ops-brief {
   background: rgba(255, 255, 255, 0.92);

@@ -696,20 +696,9 @@ QB.App = (() => {
           minute: "2-digit",
         })
       : "";
-    const loteBig =
-      last.lote != null && last.lote !== ""
-        ? QB.Data?.loteShortLabel?.(QB.Data.findLote(last.codLote || last.lote)) || `Lote ${last.lote}`
-        : "—";
-    let modSm = "—";
-    let turSm = "—";
-    if ((last.codLote || last.lote) && QB.Data?.loteMeta) {
-      const loteMeta = QB.Data.loteMeta(last.codLote || last.lote);
-      modSm = loteMeta.modulo || last.modulo || "—";
-      turSm = loteMeta.turno ? `T${loteMeta.turno}` : last.turno ? `T${last.turno}` : "—";
-    } else {
-      modSm = last.modulo || "—";
-      turSm = last.turno != null && last.turno !== "" ? `T${last.turno}` : "—";
-    }
+    const b1 = last.drenaje1 != null && last.drenaje1 !== "" ? String(last.drenaje1) : "—";
+    const b2 = last.drenaje2 != null && last.drenaje2 !== "" ? String(last.drenaje2) : "—";
+    const sfr = last.aforo != null && last.aforo !== "" ? String(last.aforo) : "—";
 
     lastWrap.innerHTML = `
       <p class="ops-section-label">Actividad reciente</p>
@@ -723,10 +712,10 @@ QB.App = (() => {
             <strong>${escapeHtml(title)}</strong>
             <p>${escapeHtml(who)}${variedad ? ` · ${escapeHtml(variedad)}` : ""}</p>
           </div>
-          <div class="ops-last-score" title="Lote · Módulo · Turno">
-            <span class="big">${escapeHtml(loteBig)}</span>
-            <span class="sm">${escapeHtml(modSm)}</span>
-            <span class="sm">${escapeHtml(turSm)}</span>
+          <div class="ops-last-score" title="B1 · B2 · Aforo">
+            <span class="sm">B1 ${escapeHtml(b1)}</span>
+            <span class="sm">B2 ${escapeHtml(b2)}</span>
+            <span class="sm">SFR ${escapeHtml(sfr)}</span>
           </div>
         </div>
       </div>`;

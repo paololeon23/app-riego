@@ -835,13 +835,22 @@ QB.API = (() => {
       .map((v) => ({ id: v, label: v, meta: "Local · emergencia", customText: true }));
   }
 
-  /** Aforos guardan módulo/turno/variedad en aforo_rows / turnos, no en la raíz */
+  /** Aforos guardan módulo/turno/variedad/volúmenes en aforo_rows / turnos */
   function aforoMetaFromData_(data) {
     const d = data || {};
     const row =
       (Array.isArray(d.aforo_rows) && d.aforo_rows[0]) ||
       (Array.isArray(d.turnos) && d.turnos[0]) ||
       null;
+    const vol = (raw) => {
+      if (raw === "" || raw == null) return "";
+      if (window.QB?.AforosParse?.parseVolume) {
+        const n = QB.AforosParse.parseVolume(raw);
+        return n != null ? String(n) : String(raw);
+      }
+      const n = Number(String(raw).replace(/[^\d.]/g, ""));
+      return Number.isFinite(n) ? String(Math.round(n)) : String(raw);
+    };
     if (!row) {
       return {
         variedad: d.variedad || "",
@@ -849,6 +858,9 @@ QB.API = (() => {
         turno: d.turno != null && d.turno !== "" ? String(d.turno) : "",
         lote: d.lote || d.codLote || "",
         fundo: d.fundo || "",
+        aforo: "",
+        drenaje1: "",
+        drenaje2: "",
       };
     }
     return {
@@ -862,6 +874,9 @@ QB.API = (() => {
             : "",
       lote: row.codLote || row.lote || d.codLote || d.lote || "",
       fundo: row.fundo || d.fundo || "",
+      aforo: vol(row.aforo),
+      drenaje1: vol(row.drenaje1),
+      drenaje2: vol(row.drenaje2),
     };
   }
 
@@ -885,6 +900,9 @@ QB.API = (() => {
       codLote: meta.lote || "",
       turno: meta.turno || "",
       fundo: meta.fundo || "",
+      aforo: meta.aforo || "",
+      drenaje1: meta.drenaje1 || "",
+      drenaje2: meta.drenaje2 || "",
       fecha,
       at: record.submittedAt || new Date().toISOString(),
     };
@@ -969,6 +987,9 @@ QB.API = (() => {
       modulo,
       turno,
       fundo: fromAforo.fundo || "",
+      aforo: fromAforo.aforo || "",
+      drenaje1: fromAforo.drenaje1 || "",
+      drenaje2: fromAforo.drenaje2 || "",
       nota: s.nota,
       calidadGlobal: s.calidadGlobal || "",
       status: "pending",
