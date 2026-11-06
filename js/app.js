@@ -2186,7 +2186,9 @@ QB.App = (() => {
   function aforoLoteDisplay_(l, fallbackNum) {
     if (l && QB.Data?.loteLabel) return QB.Data.loteLabel(l);
     const n = String(fallbackNum || l?.lote || "").trim();
-    const etapa = String(l?.etapa || "").trim().toUpperCase();
+    const etapa = QB.Data?.etapaDisplay
+      ? QB.Data.etapaDisplay(l?.etapa)
+      : String(l?.etapa || "").trim().toUpperCase();
     if (!n) return "";
     return etapa ? `${n} - ${etapa}` : n;
   }
@@ -2231,7 +2233,7 @@ QB.App = (() => {
           turno: String(turno),
           codLote: String(n),
           variedad: varLabel,
-          etapa: /mag/i.test(varLabel) ? "Licapa II" : "Licapa I",
+          etapa: /mag/i.test(varLabel) ? "Licapa II" : "LICAPA",
         },
       }));
       const q = String(query || "").trim().toLowerCase();
@@ -2414,19 +2416,31 @@ QB.App = (() => {
             setAforoTriggerDisplay_(modTrig, entry.modulo, true);
           }
           if (entry.turno) {
+            const varLabel =
+              QB.VALVULAR?.variedadFor?.(entry.modulo, entry.turno) || "";
             turHidden.value = String(entry.turno);
-            setAforoTriggerDisplay_(turTrig, `Turno ${entry.turno}`, true);
+            setAforoTriggerDisplay_(
+              turTrig,
+              varLabel ? `Turno ${entry.turno} · ${varLabel}` : `Turno ${entry.turno}`,
+              true
+            );
           }
-          const loteOpt = aforoLotesFiltrados_(entry.modulo, entry.turno, "").find(
-            (o) => String(o.raw?.lote || o.id) === String(entry.valvular)
-          );
-          if (loteOpt) {
-            const L = resolveLoteEntry_(loteOpt) || loteOpt.raw;
-            loteHidden.value = String(L?.codLote || entry.valvular);
-            setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(L, entry.valvular), true);
-          } else {
-            loteHidden.value = String(entry.valvular);
-            setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(null, entry.valvular), true);
+          // ENSAYO: no pisar el lote con el texto de válvula
+          const ensayo =
+            QB.VALVULAR?.isEnsayoValvula?.(entry.valvular) ||
+            String(entry.valvular).toUpperCase() === "ENSAYO";
+          if (!ensayo && typeof entry.valvular === "number") {
+            const loteOpt = aforoLotesFiltrados_(entry.modulo, entry.turno, "").find(
+              (o) => String(o.raw?.lote || o.id) === String(entry.valvular)
+            );
+            if (loteOpt) {
+              const L = resolveLoteEntry_(loteOpt) || loteOpt.raw;
+              loteHidden.value = String(L?.codLote || entry.valvular);
+              setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(L, entry.valvular), true);
+            } else {
+              loteHidden.value = String(entry.valvular);
+              setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(null, entry.valvular), true);
+            }
           }
         }
         saveDraft_();
@@ -3133,10 +3147,20 @@ QB.App = (() => {
 
     let aforoToast = "";
     if (ok && isAforoType_(state.type)) {
-      const turnos = readAforosTurnosFromDom_();
+      // Desde resumen: ya se validó al entrar — no pisar con DOM vacío/oculto
+      const fromResumen =
+        state.screen === "resumen" &&
+        Array.isArray(d.aforo_rows) &&
+        d.aforo_rows.length > 0 &&
+        Array.isArray(d.turnos) &&
+        d.turnos.length > 0;
+      const turnos = fromResumen ? d.turnos : readAforosTurnosFromDom_();
       d.turnos = turnos;
-      d.fecha = syncFechaHoy();
+      d.fecha = fromResumen && d.fecha ? d.fecha : syncFechaHoy();
       applyAforoDefaults_(d);
+      if (fromResumen) {
+        return d;
+      }
       let rowsOk = true;
       let volOk = true;
       for (let i = 0; i < turnos.length; i++) {

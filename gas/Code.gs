@@ -54,7 +54,9 @@ var CLIENT_ID_PROP_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 /** Valvular Licapa I / II / III */
 var VALVULAR_MAP = {
   'M1|T1': 4, 'M1|T3': 11, 'M1|T5': 21, 'M1|T7': 31, 'M1|T9': 41,
-  'M2|T2': 55, 'M2|T4': 65, 'M2|T6': 74, 'M2|T8': 82, 'M2|T10': 92,
+  'M2|T2': 55, 'M2|T4': 65, 'M2|T6': 74,
+  'M2|T7': 'ENSAYO', 'M2|T8': 'ENSAYO',
+  'M2|T10': 92,
   'M3|T1': 97, 'M3|T3': 105, 'M3|T5': 111, 'M3|T7': 120, 'M3|T9': 130,
   'M4|T2': 144, 'M4|T4': 152, 'M4|T6': 163, 'M4|T8': 170, 'M4|T10': 177,
   'M5|T1': 184, 'M5|T3': 192, 'M5|T9': 219,
@@ -66,14 +68,17 @@ var VALVULAR_MAP = {
 };
 
 function lookupValvular_(modulo, turno, lote) {
-  var fromLote = Number(String(lote || '').replace(/\D/g, ''));
-  if (isFinite(fromLote) && fromLote > 0) return fromLote;
   var mod = String(modulo || '').trim().toUpperCase().replace(/\s+/g, '');
   if (mod && mod.charAt(0) !== 'M') mod = 'M' + mod;
   var t = String(turno || '').replace(/^T/i, '').trim();
-  if (!mod || !t) return '';
-  var v = VALVULAR_MAP[mod + '|T' + Number(t)];
-  return v != null ? v : '';
+  if (mod && t) {
+    var mapped = VALVULAR_MAP[mod + '|T' + Number(t)];
+    if (typeof mapped === 'string') return mapped; // ENSAYO
+    if (mapped != null) return mapped;
+  }
+  var fromLote = Number(String(lote || '').replace(/\D/g, ''));
+  if (isFinite(fromLote) && fromLote > 0) return fromLote;
+  return '';
 }
 
 function isoWeekAforo_(fechaISO) {
@@ -168,16 +173,41 @@ function normalizeFundoLabel_(sheetName) {
   return '';
 }
 
-/** Clasifica una fila → hoja LICAPA (Sekoya Pop) o LICAPA II (Mágica) */
+/** Quita tildes para detectar MAGICA / SEKOYA sin fallar */
+function foldAsciiUpper_(s) {
+  return String(s || '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[ÁÀÄÂ]/g, 'A')
+    .replace(/[ÉÈËÊ]/g, 'E')
+    .replace(/[ÍÌÏÎ]/g, 'I')
+    .replace(/[ÓÒÖÔ]/g, 'O')
+    .replace(/[ÚÙÜÛ]/g, 'U');
+}
+
+/**
+ * Regla fija (no invertir):
+ *   SEKOYA POP → hoja LICAPA
+ *   MAGICA     → hoja LICAPA II
+ * Variedad manda; fundo es respaldo.
+ */
 function classifyAforoRowSheet_(row) {
   row = row || {};
-  var fundo = String(row.fundo || '').trim().toUpperCase().replace(/\s+/g, ' ');
-  var variedad = String(row.variedad || '').trim().toUpperCase();
-  // II primero (para no confundir con "LICAPA")
+  var variedad = foldAsciiUpper_(row.variedad);
+  var fundo = foldAsciiUpper_(row.fundo);
+
+  // 1) Variedad (fuente de verdad)
+  if (variedad.indexOf('POP') !== -1 || variedad.indexOf('SEKOYA') !== -1) {
+    return SHEET_LICAPA_I; // LICAPA
+  }
+  if (variedad.indexOf('MAG') !== -1) {
+    return SHEET_LICAPA_II; // LICAPA II
+  }
+
+  // 2) Fundo
   if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
   if (fundo === 'LICAPA' || fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
-  if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
-  if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
+
   return '';
 }
 
@@ -192,18 +222,20 @@ function resolveAforoSheetName_(data, typeOrSheet) {
   }
   if (/^licapa$/i.test(raw)) return SHEET_LICAPA_I;
 
-  var fundo = String((data && data.fundo) || '').trim().toUpperCase().replace(/\s+/g, ' ');
-  var variedad = String((data && data.variedad) || '').trim().toUpperCase();
-  if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
-  if (fundo === 'LICAPA' || fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
-  if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
-  if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
-
+  // Preferir primera fila de aforo (tiene variedad/fundo correctos)
   var rows = data && data.aforo_rows;
   if (rows && rows.length) {
     var sheet0 = classifyAforoRowSheet_(rows[0]);
     if (sheet0) return sheet0;
   }
+
+  var fondo = foldAsciiUpper_((data && data.fundo) || '');
+  var variedad = foldAsciiUpper_((data && data.variedad) || '');
+  if (variedad.indexOf('POP') !== -1 || variedad.indexOf('SEKOYA') !== -1) return SHEET_LICAPA_I;
+  if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
+  if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
+  if (fundo === 'LICAPA' || fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
+
   return '';
 }
 

@@ -5,7 +5,9 @@ QB.VALVULAR = (() => {
   /** Clave M{n}|T{t} → N° válvula / lote */
   const BY_MOD_TURNO = {
     "M1|T1": 4, "M1|T3": 11, "M1|T5": 21, "M1|T7": 31, "M1|T9": 41,
-    "M2|T2": 55, "M2|T4": 65, "M2|T6": 74, "M2|T8": 82, "M2|T10": 92,
+    "M2|T2": 55, "M2|T4": 65, "M2|T6": 74,
+    "M2|T7": "ENSAYO", "M2|T8": "ENSAYO",
+    "M2|T10": 92,
     "M3|T1": 97, "M3|T3": 105, "M3|T5": 111, "M3|T7": 120, "M3|T9": 130,
     "M4|T2": 144, "M4|T4": 152, "M4|T6": 163, "M4|T8": 170, "M4|T10": 177,
     "M5|T1": 184, "M5|T3": 192, "M5|T9": 219,
@@ -20,7 +22,9 @@ QB.VALVULAR = (() => {
   /** Variedad oficial por módulo+turno — siempre MAYÚSCULAS en UI */
   const VARIEDAD_BY_MT = {
     "M1|T1": "SEKOYA POP", "M1|T3": "SEKOYA POP", "M1|T5": "SEKOYA POP", "M1|T7": "SEKOYA POP", "M1|T9": "SEKOYA POP",
-    "M2|T2": "SEKOYA POP", "M2|T4": "SEKOYA POP", "M2|T6": "SEKOYA POP", "M2|T8": "SEKOYA POP", "M2|T10": "SEKOYA POP",
+    "M2|T2": "SEKOYA POP", "M2|T4": "SEKOYA POP", "M2|T6": "SEKOYA POP",
+    "M2|T7": "SEKOYA POP", "M2|T8": "SEKOYA POP",
+    "M2|T10": "SEKOYA POP",
     "M3|T1": "SEKOYA POP", "M3|T3": "SEKOYA POP", "M3|T5": "SEKOYA POP", "M3|T7": "SEKOYA POP", "M3|T9": "SEKOYA POP",
     "M4|T2": "SEKOYA POP", "M4|T4": "SEKOYA POP", "M4|T6": "SEKOYA POP", "M4|T8": "SEKOYA POP", "M4|T10": "SEKOYA POP",
     "M5|T1": "SEKOYA POP", "M5|T3": "SEKOYA POP", "M5|T9": "SEKOYA POP",
@@ -73,17 +77,25 @@ QB.VALVULAR = (() => {
   }
 
   function lookup({ modulo, turno, lote } = {}) {
+    const mod = normModulo(modulo);
+    const t = normTurno(turno);
+    if (mod && t) {
+      const v = BY_MOD_TURNO[`${mod}|T${t}`];
+      // ENSAYO u otro texto: siempre desde módulo+turno
+      if (typeof v === "string") return v;
+      if (v != null) return v;
+    }
     const fromLote = Number(String(lote || "").replace(/\D/g, ""));
     if (Number.isFinite(fromLote) && fromLote > 0) {
       const hit = entries().find((e) => e.valvular === fromLote);
       if (hit) return hit.valvular;
       return fromLote;
     }
-    const mod = normModulo(modulo);
-    const t = normTurno(turno);
-    if (!mod || !t) return "";
-    const v = BY_MOD_TURNO[`${mod}|T${t}`];
-    return v != null ? v : "";
+    return "";
+  }
+
+  function isEnsayoValvula(raw) {
+    return String(raw || "").trim().toUpperCase() === "ENSAYO";
   }
 
   /** true si ese módulo+turno es válido para aforos SFR */
@@ -160,7 +172,8 @@ QB.VALVULAR = (() => {
     let list = entries().filter((e) => {
       if (mod && e.modulo !== mod) return false;
       if (t && e.turno !== t) return false;
-      if (loteN && e.valvular !== loteN) return false;
+      // ENSAYO no se filtra por N° de lote
+      if (loteN && typeof e.valvular === "number" && e.valvular !== loteN) return false;
       return true;
     });
     if (q) {
@@ -183,6 +196,7 @@ QB.VALVULAR = (() => {
     BY_MOD_TURNO,
     VARIEDAD_BY_MT,
     lookup,
+    isEnsayoValvula,
     variedadFor,
     hasModTurno,
     normModulo,

@@ -835,8 +835,39 @@ QB.API = (() => {
       .map((v) => ({ id: v, label: v, meta: "Local · emergencia", customText: true }));
   }
 
+  /** Aforos guardan módulo/turno/variedad en aforo_rows / turnos, no en la raíz */
+  function aforoMetaFromData_(data) {
+    const d = data || {};
+    const row =
+      (Array.isArray(d.aforo_rows) && d.aforo_rows[0]) ||
+      (Array.isArray(d.turnos) && d.turnos[0]) ||
+      null;
+    if (!row) {
+      return {
+        variedad: d.variedad || "",
+        modulo: d.modulo || "",
+        turno: d.turno != null && d.turno !== "" ? String(d.turno) : "",
+        lote: d.lote || d.codLote || "",
+        fundo: d.fundo || "",
+      };
+    }
+    return {
+      variedad: row.variedad || d.variedad || "",
+      modulo: row.modulo || d.modulo || "",
+      turno:
+        row.turno != null && row.turno !== ""
+          ? String(row.turno)
+          : d.turno != null && d.turno !== ""
+            ? String(d.turno)
+            : "",
+      lote: row.codLote || row.lote || d.codLote || d.lote || "",
+      fundo: row.fundo || d.fundo || "",
+    };
+  }
+
   function activityEntryLight_(record) {
     const data = record.data || {};
+    const meta = aforoMetaFromData_(data);
     const fecha =
       String(data.fecha || "").trim() ||
       dayKeyLima_(record.submittedAt) ||
@@ -848,10 +879,12 @@ QB.API = (() => {
       calidadGlobal: record.score?.calidadGlobal,
       evaluador: data.evaluador || "",
       cosechador: data.cosechador || "",
-      variedad: data.variedad || "",
-      modulo: data.modulo || "",
-      lote: data.lote || "",
-      turno: data.turno != null && data.turno !== "" ? String(data.turno) : "",
+      variedad: meta.variedad || "",
+      modulo: meta.modulo || "",
+      lote: meta.lote || "",
+      codLote: meta.lote || "",
+      turno: meta.turno || "",
+      fundo: meta.fundo || "",
       fecha,
       at: record.submittedAt || new Date().toISOString(),
     };
@@ -908,15 +941,20 @@ QB.API = (() => {
     const s = item.score || {};
     const at = item.submittedAt || item.at || "";
     const type = normEvalType_(item.type) || item.type || "";
-    let lote = d.lote || "";
-    let modulo = d.modulo || "";
-    let turno = d.turno != null && d.turno !== "" ? String(d.turno) : "";
+    const fromAforo = aforoMetaFromData_(d);
+    let lote = fromAforo.lote || d.lote || "";
+    let modulo = fromAforo.modulo || d.modulo || "";
+    let turno =
+      fromAforo.turno ||
+      (d.turno != null && d.turno !== "" ? String(d.turno) : "");
+    let variedad = fromAforo.variedad || d.variedad || "";
     // loteMeta es caro: solo en historial visible, no en KPIs
     if (!light && lote && window.QB?.Data?.loteMeta) {
       const meta = QB.Data.loteMeta(lote);
       if (meta.modulo) modulo = meta.modulo;
       if (meta.turno) turno = meta.turno;
       if (meta.lote) lote = meta.lote;
+      if (!variedad && meta.raw?.variedad) variedad = meta.raw.variedad;
     }
     return {
       id: item.clientId || at || `pending_${Math.random().toString(36).slice(2, 8)}`,
@@ -925,10 +963,12 @@ QB.API = (() => {
       at,
       evaluador: d.evaluador || "",
       cosechador: d.cosechador || "",
-      variedad: d.variedad || "",
+      variedad,
       lote,
+      codLote: lote,
       modulo,
       turno,
+      fundo: fromAforo.fundo || "",
       nota: s.nota,
       calidadGlobal: s.calidadGlobal || "",
       status: "pending",

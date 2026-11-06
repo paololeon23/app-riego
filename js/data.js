@@ -223,9 +223,18 @@ QB.Data = (() => {
     return dni ? `${dni} — ${short}` : short;
   }
 
+  /** Etapa visible: LICAPA (no “LICAPA I”) / LICAPA II */
+  function etapaDisplay(etapa) {
+    const e = String(etapa || "").trim().toUpperCase();
+    if (!e) return "";
+    if (e.includes("II")) return "LICAPA II";
+    if (e.includes("I") || e.includes("LICAPA")) return "LICAPA";
+    return e;
+  }
+
   function loteLabel(l) {
     if (!l) return "";
-    const etapa = String(l.etapa || "").trim().toUpperCase();
+    const etapa = etapaDisplay(l.etapa);
     const n = String(l.lote ?? "").trim();
     return etapa ? `${n} - ${etapa}` : n;
   }
@@ -621,6 +630,7 @@ QB.Data = (() => {
     loteCount,
     mapVariedad,
     etapaKind,
+    etapaDisplay,
     shortName,
     personLabel,
     formatStoredPerson,
