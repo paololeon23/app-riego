@@ -969,6 +969,10 @@ body.is-desktop .qb-toast-stack {
   margin-bottom: 0;
   align-items: stretch;
 }
+.ops-last {
+  margin-top: 20px;
+  padding-top: 4px;
+}
 .ops-metric {
   display: flex;
   flex-direction: column;
@@ -1306,9 +1310,9 @@ body.is-desktop .qb-toast-stack {
   align-items: stretch;
   justify-content: center;
   gap: 3px;
-  width: 78px;
-  min-width: 78px;
-  max-width: 86px;
+  width: 88px;
+  min-width: 84px;
+  max-width: 96px;
   padding: 5px 4px;
   overflow: visible;
   border-radius: 10px;
@@ -1319,7 +1323,6 @@ body.is-desktop .qb-toast-stack {
 }
 .ops-last-score .sm {
   display: block;
-  width: 100%;
   padding: 2px 3px;
   border-radius: 6px;
   font-size: 0.56rem;
@@ -1331,6 +1334,21 @@ body.is-desktop .qb-toast-stack {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.ops-last-score .sm.sfr {
+  width: 100%;
+  font-weight: 800;
+  font-size: 0.6rem;
+}
+.ops-last-brow {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+}
+.ops-last-brow .sm {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.52rem;
 }
 .ops-brief {
   background: rgba(255, 255, 255, 0.92);

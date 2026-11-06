@@ -1074,6 +1074,42 @@ QB.API = (() => {
       }
     }
 
+    // Si la ficha liviana no trae volúmenes, completar desde la cola local (IDB)
+    if (last && !(last.aforo || last.drenaje1 || last.drenaje2)) {
+      const cid = String(last.clientId || "").trim();
+      if (cid) {
+        for (let i = 0; i < memQueue.length; i++) {
+          const q = memQueue[i];
+          if (!q || String(q.clientId || "") !== cid) continue;
+          const full = queueToHistoryEntry(q, true);
+          last = {
+            ...last,
+            aforo: full.aforo || last.aforo || "",
+            drenaje1: full.drenaje1 || last.drenaje1 || "",
+            drenaje2: full.drenaje2 || last.drenaje2 || "",
+            variedad: full.variedad || last.variedad || "",
+            modulo: full.modulo || last.modulo || "",
+            turno: full.turno || last.turno || "",
+            lote: full.lote || last.lote || "",
+          };
+          break;
+        }
+      }
+      // Último recurso: primer pendiente del día con volúmenes
+      if (!(last.aforo || last.drenaje1 || last.drenaje2)) {
+        for (let i = 0; i < memQueue.length; i++) {
+          const q = memQueue[i];
+          if (!q || q.status === "sent") continue;
+          if (opsDayKey_(q) !== day) continue;
+          const full = queueToHistoryEntry(q, true);
+          if (full.aforo || full.drenaje1 || full.drenaje2) {
+            last = { ...last, ...full, status: last.status || "pending" };
+            break;
+          }
+        }
+      }
+    }
+
     return {
       day,
       total,

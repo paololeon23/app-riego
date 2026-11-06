@@ -5,7 +5,7 @@ QB.CONFIG = {
   /** Endpoint codificado (uso interno) */
   _ep: "aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J4TElkNDdpQUZ0ZGdJYkRKMkdneXR6YWw4bnp3Mng0WE1velRhMXhHSEtORGo4djFoZmhBQVNDRUM2bTBtWXN2cVUvZXhlYw==",
   APP_NAME: "APP RIEGO",
-  VERSION: "1.8.9",
+  VERSION: "1.9.2",
   /** Un solo formulario; LICAPA / LICAPA II se separan al guardar en Sheets */
   ACTIVE_EVALS: ["aforos"],
   /** URL pública HTTPS para QR / instalación Android */

@@ -712,10 +712,12 @@ QB.App = (() => {
             <strong>${escapeHtml(title)}</strong>
             <p>${escapeHtml(who)}${variedad ? ` · ${escapeHtml(variedad)}` : ""}</p>
           </div>
-          <div class="ops-last-score" title="B1 · B2 · Aforo">
-            <span class="sm">B1 ${escapeHtml(b1)}</span>
-            <span class="sm">B2 ${escapeHtml(b2)}</span>
-            <span class="sm">SFR ${escapeHtml(sfr)}</span>
+          <div class="ops-last-score" title="Aforo · B1 · B2">
+            <span class="sm sfr">SFR: ${escapeHtml(sfr)}</span>
+            <div class="ops-last-brow">
+              <span class="sm">B1: ${escapeHtml(b1)}</span>
+              <span class="sm">B2: ${escapeHtml(b2)}</span>
+            </div>
           </div>
         </div>
       </div>`;
