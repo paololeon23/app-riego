@@ -51,32 +51,44 @@ var CACHE_TTL_SEC = 21600; // 6 h (límite máx. CacheService)
 /** clientId enviados: se guardan también en Properties (anti-duplicado durable) */
 var CLIENT_ID_PROP_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 
-/** Valvular Licapa I / II / III */
+/** Valvular oficial (1 lote = 1 válvula numérica) */
 var VALVULAR_MAP = {
   'M1|T1': 4, 'M1|T3': 11, 'M1|T5': 21, 'M1|T7': 31, 'M1|T9': 41,
-  'M2|T2': 55, 'M2|T4': 65, 'M2|T6': 74,
-  'M2|T7': 'ENSAYO', 'M2|T8': 'ENSAYO',
-  'M2|T10': 92,
+  'M2|T2': 55, 'M2|T4': 65, 'M2|T6': 74, 'M2|T8': 82, 'M2|T10': 92,
   'M3|T1': 97, 'M3|T3': 105, 'M3|T5': 111, 'M3|T7': 120, 'M3|T9': 130,
   'M4|T2': 144, 'M4|T4': 152, 'M4|T6': 163, 'M4|T8': 170, 'M4|T10': 177,
   'M5|T1': 184, 'M5|T3': 192, 'M5|T9': 219,
-  'M6|T2': 249, 'M6|T4': 251, 'M6|T8': 260, 'M6|T10': 271,
+  'M6|T8': 260, 'M6|T10': 271,
   'M7|T1': 283, 'M7|T3': 293, 'M7|T5': 301, 'M7|T7': 309, 'M7|T9': 318,
   'M8|T2': 330, 'M8|T4': 338, 'M8|T6': 349, 'M8|T8': 360, 'M8|T10': 368,
   'M9|T1': 374, 'M9|T3': 384, 'M9|T5': 396, 'M9|T7': 405, 'M9|T9': 414,
-  'M10|T5': 200, 'M10|T6': 204, 'M10|T7': 202, 'M10|T8': 216, 'M10|T10': 223, 'M10|T11': 209
+  'M10|T7': 202, 'M10|T8': 216, 'M10|T11': 209
 };
 
+/** Lotes ENSAYO → columna VALVULAR = "80(ENSAYO)" / "84(ENSAYO)" */
+var ENSAYO_LOTES = {
+  '80': true,
+  '84': true
+};
+
+function ensayoLabel_(loteN) {
+  var n = String(loteN || '').replace(/\D/g, '');
+  return n && ENSAYO_LOTES[n] ? n + '(ENSAYO)' : '';
+}
+
 function lookupValvular_(modulo, turno, lote) {
+  var loteN = String(lote || '').replace(/\D/g, '');
+  var ens = ensayoLabel_(loteN);
+  if (ens) return ens;
   var mod = String(modulo || '').trim().toUpperCase().replace(/\s+/g, '');
   if (mod && mod.charAt(0) !== 'M') mod = 'M' + mod;
   var t = String(turno || '').replace(/^T/i, '').trim();
   if (mod && t) {
     var mapped = VALVULAR_MAP[mod + '|T' + Number(t)];
-    if (typeof mapped === 'string') return mapped; // ENSAYO
+    if (typeof mapped === 'string') return mapped;
     if (mapped != null) return mapped;
   }
-  var fromLote = Number(String(lote || '').replace(/\D/g, ''));
+  var fromLote = Number(loteN);
   if (isFinite(fromLote) && fromLote > 0) return fromLote;
   return '';
 }
@@ -324,11 +336,16 @@ function buildAforoMatrix_(data, fechaISO, horaGuardada) {
     var turno = r.turno != null && r.turno !== '' ? Number(r.turno) : '';
     var eto = etoGlobal !== '' ? etoGlobal : (r.eto !== '' && r.eto != null ? r.eto : '');
     var lamina = laminaGlobal !== '' ? laminaGlobal : (r.lamina !== '' && r.lamina != null ? r.lamina : '');
+    var loteRaw = r.lote || r.codLote || '';
+    var loteN = String(loteRaw).replace(/\D/g, '');
     var valvular = r.valvula !== '' && r.valvula != null
       ? r.valvula
       : (r.valvular !== '' && r.valvular != null
         ? r.valvular
-        : lookupValvular_(modulo, turno, r.lote || r.codLote));
+        : lookupValvular_(modulo, turno, loteRaw));
+    // Lotes ENSAYO → celda "80(ENSAYO)" / "84(ENSAYO)"
+    var ensCell = ensayoLabel_(loteN) || ensayoLabel_(valvular);
+    if (ensCell) valvular = ensCell;
     var variedad = r.variedad || data.variedad || '';
     var fundo = r.fundo || data.fundo || '';
     var rowMap = {

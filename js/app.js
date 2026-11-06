@@ -2100,15 +2100,7 @@ QB.App = (() => {
       if (L) loteShown = aforoLoteDisplay_(L, L.lote);
       else if (row.lote) loteShown = aforoLoteDisplay_(null, row.lote);
     }
-    const turnoVar =
-      row.turno && QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
-        ? QB.VALVULAR.variedadFor(row.modulo, row.turno)
-        : "";
-    const turnoShown = row.turno
-      ? turnoVar
-        ? `Turno ${row.turno} · ${turnoVar}`
-        : `Turno ${row.turno}`
-      : "";
+    const turnoShown = row.turno ? `Turno ${row.turno}` : "";
     const valvula =
       row.valvula ||
       (QB.VALVULAR
@@ -2293,27 +2285,8 @@ QB.App = (() => {
           : QB.Data?.turnoOptions?.(mod, q) || [];
       },
       storeValue: (opt) => String(opt?.id || ""),
-      resolveOption: (val) => {
-        if (!val) return null;
-        const mod = readMod();
-        const varLabel =
-          QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
-            ? QB.VALVULAR.variedadFor(mod, val)
-            : "";
-        return {
-          id: val,
-          label: varLabel ? `Turno ${val} · ${varLabel}` : `Turno ${val}`,
-        };
-      },
-      formatValue: (_opt, val) => {
-        if (!val) return "";
-        const mod = readMod();
-        const varLabel =
-          QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
-            ? QB.VALVULAR.variedadFor(mod, val)
-            : "";
-        return varLabel ? `Turno ${val} · ${varLabel}` : `Turno ${val}`;
-      },
+      resolveOption: (val) => (val ? { id: val, label: `Turno ${val}` } : null),
+      formatValue: (_opt, val) => (val ? `Turno ${val}` : ""),
       onChange: () => {
         // Al cambiar turno: limpiar lote, válvula y volúmenes
         clearAforoHidden_(block, "lote", idx, "Seleccionar...");
@@ -2407,20 +2380,27 @@ QB.App = (() => {
             setAforoTriggerDisplay_(modTrig, entry.modulo, true);
           }
           if (entry.turno) {
-            const varLabel =
-              QB.VALVULAR?.variedadFor?.(entry.modulo, entry.turno) || "";
             turHidden.value = String(entry.turno);
-            setAforoTriggerDisplay_(
-              turTrig,
-              varLabel ? `Turno ${entry.turno} · ${varLabel}` : `Turno ${entry.turno}`,
-              true
-            );
+            setAforoTriggerDisplay_(turTrig, `Turno ${entry.turno}`, true);
           }
-          // ENSAYO: no pisar el lote con el texto de válvula
+          // ENSAYO: fijar lote real (80/84) y válvula "80(ENSAYO)"
           const ensayo =
+            entry.ensayo ||
             QB.VALVULAR?.isEnsayoValvula?.(entry.valvular) ||
-            String(entry.valvular).toUpperCase() === "ENSAYO";
-          if (!ensayo && typeof entry.valvular === "number") {
+            /\(\s*ENSAYO\s*\)$/i.test(String(entry.valvular || ""));
+          if (ensayo && entry.lote) {
+            const loteOpt = aforoLotesFiltrados_(entry.modulo, entry.turno, "").find(
+              (o) => String(o.raw?.lote || o.id) === String(entry.lote)
+            );
+            if (loteOpt) {
+              const L = resolveLoteEntry_(loteOpt) || loteOpt.raw;
+              loteHidden.value = String(L?.codLote || entry.lote);
+              setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(L, entry.lote), true);
+            } else {
+              loteHidden.value = String(entry.lote);
+              setAforoTriggerDisplay_(loteTrig, aforoLoteDisplay_(null, entry.lote), true);
+            }
+          } else if (typeof entry.valvular === "number") {
             const loteOpt = aforoLotesFiltrados_(entry.modulo, entry.turno, "").find(
               (o) => String(o.raw?.lote || o.id) === String(entry.valvular)
             );
