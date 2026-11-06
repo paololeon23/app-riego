@@ -1,18 +1,22 @@
 /**
  * APP RIEGO — Google Apps Script
  * Hojas separadas:
- *   - "Licapa I - Sekoya Pop"
- *   - "Licapa II - Mágica"
+ *   - "LICAPA"      ← Sekoya Pop (antes Licapa I)
+ *   - "LICAPA II"   ← Mágica
+ * En celda FUNDO: "LICAPA" / "LICAPA II"
  * ------------------------------------------------------------
  * SETUP:
  * 1) Pegar este archivo en el Apps Script del Sheet
- * 2) (Opcional) Ejecutar setupAforos() una vez
+ * 2) (Opcional) Ejecutar setupAforos() una vez (renombra hojas viejas)
  * 3) Implementar → Web App → URL …/exec → js/config.js
  */
 
-var SHEET_LICAPA_I = 'Licapa I - Sekoya Pop';
-var SHEET_LICAPA_II = 'Licapa II - Mágica';
-var AFOROS_SHEET = SHEET_LICAPA_II; // compat ping
+var SHEET_LICAPA_I = 'LICAPA';
+var SHEET_LICAPA_II = 'LICAPA II';
+/** Nombres antiguos → se renombran en setupAforos / getOrCreate */
+var SHEET_LICAPA_I_LEGACY = ['Licapa I - Sekoya Pop', 'Licapa I', 'LICAPA I'];
+var SHEET_LICAPA_II_LEGACY = ['Licapa II - Mágica', 'Licapa II'];
+/** La hoja "Aforos y Drenajes" YA NO se usa. */
 
 var AFOROS_HEADERS = [
   'AÑO', 'FECHA', 'SEMANA', 'FUNDO', 'VARIEDAD', 'MÓDULO', 'TURNO', 'VALVULAR',
@@ -43,7 +47,9 @@ var AFORO_COLORS = {
   }
 };
 
-var CACHE_TTL_SEC = 21600; // 6 h
+var CACHE_TTL_SEC = 21600; // 6 h (límite máx. CacheService)
+/** clientId enviados: se guardan también en Properties (anti-duplicado durable) */
+var CLIENT_ID_PROP_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 
 /** Valvular Licapa I / II / III */
 var VALVULAR_MAP = {
@@ -52,11 +58,11 @@ var VALVULAR_MAP = {
   'M3|T1': 97, 'M3|T3': 105, 'M3|T5': 111, 'M3|T7': 120, 'M3|T9': 130,
   'M4|T2': 144, 'M4|T4': 152, 'M4|T6': 163, 'M4|T8': 170, 'M4|T10': 177,
   'M5|T1': 184, 'M5|T3': 192, 'M5|T9': 219,
-  'M6|T8': 260, 'M6|T10': 271,
+  'M6|T2': 249, 'M6|T4': 251, 'M6|T8': 260, 'M6|T10': 271,
   'M7|T1': 283, 'M7|T3': 293, 'M7|T5': 301, 'M7|T7': 309, 'M7|T9': 318,
   'M8|T2': 330, 'M8|T4': 338, 'M8|T6': 349, 'M8|T8': 360, 'M8|T10': 368,
   'M9|T1': 374, 'M9|T3': 384, 'M9|T5': 396, 'M9|T7': 405, 'M9|T9': 414,
-  'M10|T7': 202, 'M10|T8': 216, 'M10|T11': 209
+  'M10|T5': 200, 'M10|T6': 204, 'M10|T7': 202, 'M10|T8': 216, 'M10|T10': 223, 'M10|T11': 209
 };
 
 function lookupValvular_(modulo, turno, lote) {
@@ -155,13 +161,21 @@ function ensureAforosHeaders_(sheet) {
   styleAforoHeader_(sheet);
 }
 
-/** Clasifica una fila → hoja Licapa I (Sekoya Pop) o Licapa II (Mágica) */
+/** FUNDO en celda: LICAPA (Sekoya) o LICAPA II (Mágica) */
+function normalizeFundoLabel_(sheetName) {
+  if (sheetName === SHEET_LICAPA_II) return 'LICAPA II';
+  if (sheetName === SHEET_LICAPA_I) return 'LICAPA';
+  return '';
+}
+
+/** Clasifica una fila → hoja LICAPA (Sekoya Pop) o LICAPA II (Mágica) */
 function classifyAforoRowSheet_(row) {
   row = row || {};
-  var fundo = String(row.fundo || '').trim().toUpperCase();
+  var fundo = String(row.fundo || '').trim().toUpperCase().replace(/\s+/g, ' ');
   var variedad = String(row.variedad || '').trim().toUpperCase();
+  // II primero (para no confundir con "LICAPA")
   if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
-  if (fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
+  if (fundo === 'LICAPA' || fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
   if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
   if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
   return '';
@@ -170,15 +184,18 @@ function classifyAforoRowSheet_(row) {
 function resolveAforoSheetName_(data, typeOrSheet) {
   var raw = String(typeOrSheet || '').trim();
   var t = raw.toLowerCase();
-  if (t === 'licapa_i' || raw === SHEET_LICAPA_I) return SHEET_LICAPA_I;
-  if (t === 'licapa_ii' || raw === SHEET_LICAPA_II) return SHEET_LICAPA_II;
-  if (/licapa\s*ii/i.test(raw)) return SHEET_LICAPA_II;
-  if (/licapa\s*i\b/i.test(raw)) return SHEET_LICAPA_I;
+  if (t === 'licapa_i' || raw === SHEET_LICAPA_I || (/^licapa\s*i\b/i.test(raw) && !/ii/i.test(raw))) {
+    return SHEET_LICAPA_I;
+  }
+  if (t === 'licapa_ii' || raw === SHEET_LICAPA_II || /licapa\s*ii/i.test(raw)) {
+    return SHEET_LICAPA_II;
+  }
+  if (/^licapa$/i.test(raw)) return SHEET_LICAPA_I;
 
-  var fundo = String((data && data.fundo) || '').trim().toUpperCase();
+  var fundo = String((data && data.fundo) || '').trim().toUpperCase().replace(/\s+/g, ' ');
   var variedad = String((data && data.variedad) || '').trim().toUpperCase();
   if (fundo.indexOf('II') !== -1) return SHEET_LICAPA_II;
-  if (fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
+  if (fundo === 'LICAPA' || fundo.indexOf('LICAPA I') !== -1) return SHEET_LICAPA_I;
   if (variedad.indexOf('POP') !== -1) return SHEET_LICAPA_I;
   if (variedad.indexOf('MAG') !== -1) return SHEET_LICAPA_II;
 
@@ -190,7 +207,23 @@ function resolveAforoSheetName_(data, typeOrSheet) {
   return '';
 }
 
+function renameLegacyAforoSheet_(ss, targetName, legacyNames) {
+  if (ss.getSheetByName(targetName)) return;
+  for (var i = 0; i < legacyNames.length; i++) {
+    var old = ss.getSheetByName(legacyNames[i]);
+    if (old) {
+      try {
+        old.setName(targetName);
+        return;
+      } catch (_) {}
+    }
+  }
+}
+
 function getOrCreateAforoSheet_(ss, name) {
+  if (name === SHEET_LICAPA_I) renameLegacyAforoSheet_(ss, SHEET_LICAPA_I, SHEET_LICAPA_I_LEGACY);
+  if (name === SHEET_LICAPA_II) renameLegacyAforoSheet_(ss, SHEET_LICAPA_II, SHEET_LICAPA_II_LEGACY);
+
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
@@ -200,7 +233,7 @@ function getOrCreateAforoSheet_(ss, name) {
   return sheet;
 }
 
-/** Manual: crea / prepara Licapa I y Licapa II */
+/** Manual: crea / prepara hojas LICAPA y LICAPA II */
 function setupAforos() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   getOrCreateAforoSheet_(ss, SHEET_LICAPA_I);
@@ -427,12 +460,11 @@ function enrichAforoRowsFundo_(rows) {
   for (var i = 0; i < list.length; i++) {
     var r = list[i] || {};
     var sheet = classifyAforoRowSheet_(r);
-    if (sheet === SHEET_LICAPA_I) {
-      r.fundo = 'LICAPA I';
-      if (!r.variedad) r.variedad = 'S. Pop';
-    } else if (sheet === SHEET_LICAPA_II) {
-      r.fundo = 'LICAPA II';
-      if (!r.variedad) r.variedad = 'Mágica';
+    if (sheet === SHEET_LICAPA_I || sheet === SHEET_LICAPA_II) {
+      r.fundo = normalizeFundoLabel_(sheet);
+      if (!r.variedad) {
+        r.variedad = sheet === SHEET_LICAPA_II ? 'MAGICA' : 'SEKOYA POP';
+      }
     }
     list[i] = r;
   }
@@ -484,8 +516,8 @@ function appendAforos_(ss, body, clientId, stamp) {
 
   if (rowsI.length) {
     var dataI = Object.assign({}, data, {
-      fundo: 'LICAPA I',
-      variedad: 'S. Pop',
+      fundo: 'LICAPA',
+      variedad: 'SEKOYA POP',
       aforo_rows: rowsI
     });
     var sheetI = getOrCreateAforoSheet_(ss, SHEET_LICAPA_I);
@@ -498,7 +530,7 @@ function appendAforos_(ss, body, clientId, stamp) {
   if (rowsII.length) {
     var dataII = Object.assign({}, data, {
       fundo: 'LICAPA II',
-      variedad: 'Mágica',
+      variedad: 'MAGICA',
       aforo_rows: rowsII
     });
     var sheetII = getOrCreateAforoSheet_(ss, SHEET_LICAPA_II);
@@ -651,8 +683,28 @@ function clientIdKey_(clientId) {
 function isDuplicateClient_(clientId) {
   var id = String(clientId || '').trim();
   if (!id) return false;
+  var key = clientIdKey_(id);
+  // 1) Caché rápida (segundos)
   try {
-    if (CacheService.getScriptCache().get(clientIdKey_(id))) return true;
+    if (CacheService.getScriptCache().get(key)) return true;
+  } catch (_) {}
+  // 2) Properties durable (días) — evita duplicados si el celular reintenta tarde
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty(key);
+    if (raw) {
+      var ts = Number(raw);
+      if (!isFinite(ts) || Date.now() - ts <= CLIENT_ID_PROP_TTL_MS) {
+        // refrescar caché rápida
+        try {
+          CacheService.getScriptCache().put(key, '1', CACHE_TTL_SEC);
+        } catch (_c) {}
+        return true;
+      }
+      // vencido → limpiar
+      try {
+        PropertiesService.getScriptProperties().deleteProperty(key);
+      } catch (_d) {}
+    }
   } catch (_) {}
   return false;
 }
@@ -660,8 +712,13 @@ function isDuplicateClient_(clientId) {
 function markClientIdDone_(clientId) {
   var id = String(clientId || '').trim();
   if (!id) return;
+  var key = clientIdKey_(id);
+  var now = String(Date.now());
   try {
-    CacheService.getScriptCache().put(clientIdKey_(id), '1', CACHE_TTL_SEC);
+    CacheService.getScriptCache().put(key, '1', CACHE_TTL_SEC);
+  } catch (_) {}
+  try {
+    PropertiesService.getScriptProperties().setProperty(key, now);
   } catch (_) {}
 }
 
@@ -696,6 +753,6 @@ function nowIso_() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('APP RIEGO')
-    .addItem('Preparar hojas Licapa I / Licapa II', 'setupAforos')
+    .addItem('Preparar hojas LICAPA / LICAPA II', 'setupAforos')
     .addToUi();
 }

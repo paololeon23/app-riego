@@ -277,7 +277,8 @@
 
       // Registrar SW pronto para que Chrome ofrezca instalar
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js").then(function () {
+        navigator.serviceWorker.register("./sw.js").then(function (reg) {
+          try { reg.update(); } catch (e) {}
           setStatus("Casi listo…");
           // Si el evento ya llegó o llega tarde
           setTimeout(function () {

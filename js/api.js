@@ -8,6 +8,8 @@ QB.API = (() => {
   const CUSTOM_VALUES_KEY = "qb_custom_values";
   const ACTIVITY_KEY = "qb_activity";
   const DAY_STATS_KEY = "qb_day_stats"; // conteo preciso Total del día / por tipo
+  const SENT_IDS_KEY = "qb_sent_client_ids"; // anti-duplicado local (no reenviar confirmados)
+  const SENT_IDS_MAX = 800;
   const IDB_NAME = "qb_calidad_db";
   const IDB_STORE = "queue";
   const IDB_VER = 2;
@@ -212,6 +214,34 @@ QB.API = (() => {
   function cryptoRandom() {
     if (crypto?.randomUUID) return crypto.randomUUID();
     return `qb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  /** clientIds ya confirmados por el servidor (ok / duplicate) */
+  function loadSentIds_() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(SENT_IDS_KEY) || "[]");
+      return Array.isArray(raw) ? raw.map(String).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function wasAlreadySent_(clientId) {
+    const id = String(clientId || "").trim();
+    if (!id) return false;
+    const list = loadSentIds_();
+    return list.indexOf(id) !== -1;
+  }
+
+  function rememberSentId_(clientId) {
+    const id = String(clientId || "").trim();
+    if (!id) return;
+    let list = loadSentIds_().filter((x) => x !== id);
+    list.push(id);
+    if (list.length > SENT_IDS_MAX) list = list.slice(list.length - SENT_IDS_MAX);
+    try {
+      localStorage.setItem(SENT_IDS_KEY, JSON.stringify(list));
+    } catch (_) {}
   }
 
   function apiUrl_() {
@@ -1139,9 +1169,15 @@ QB.API = (() => {
     const keepTrying = !!opts.keepTrying;
     const limit = opts.limit || BATCH_SIZE;
     const out = [];
+    const dropSent = [];
     for (let i = 0; i < memQueue.length; i++) {
       const x = memQueue[i];
       if (!x || !x.clientId) continue;
+      // Ya confirmado antes → no reenviar (anti-duplicado local)
+      if (wasAlreadySent_(x.clientId)) {
+        dropSent.push(x.clientId);
+        continue;
+      }
       if (!keepTrying && (Number(x.attempts) || 0) >= MAX_ATTEMPTS) continue;
       if (!includeOld && !isRecent_(x.submittedAt || x.at)) continue;
       const st = x.status || "pending";
@@ -1152,6 +1188,12 @@ QB.API = (() => {
           if (out.length >= limit) break;
         }
       }
+    }
+    if (dropSent.length) {
+      const drop = new Set(dropSent);
+      memQueue = memQueue.filter((x) => !drop.has(x.clientId));
+      refreshPendingCount_();
+      idbMutateBatch_([], dropSent).catch(() => {});
     }
     return out;
   }
@@ -1212,6 +1254,7 @@ QB.API = (() => {
         aborted = err?.name === "AbortError";
       }
       if (ok) {
+        rememberSentId_(item.clientId);
         memQueue = memQueue.filter((x) => x.clientId !== item.clientId);
         refreshPendingCount_();
         try {
@@ -1238,6 +1281,7 @@ QB.API = (() => {
       const item = batch[i];
       const r = resultsById[item.clientId];
       if (r && (r.ok === true || r.created === true || r.duplicate === true)) {
+        rememberSentId_(item.clientId);
         toDelete.push(item.clientId);
         logActivity(item, { buffer: true });
         sent += 1;

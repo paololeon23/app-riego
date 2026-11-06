@@ -115,22 +115,27 @@ QB.AforosParse = (() => {
       let varRow = "";
       if (L?.variedad) {
         varRow = QB.Data.mapVariedad
-          ? QB.Data.mapVariedad(L.variedad) || L.variedad
-          : L.variedad;
+          ? QB.Data.mapVariedad(L.variedad) || String(L.variedad).toUpperCase()
+          : String(L.variedad).toUpperCase();
       } else if (variedad) {
-        varRow = variedad;
+        varRow = QB.Data.mapVariedad
+          ? QB.Data.mapVariedad(variedad) || String(variedad).toUpperCase()
+          : String(variedad).toUpperCase();
       }
       let fundoRow = "";
       const kind = L?.etapa && QB.Data?.etapaKind ? QB.Data.etapaKind(L.etapa) : "";
       if (kind === "I" || /pop/i.test(String(varRow))) {
-        fundoRow = "LICAPA I";
-        varRow = varRow || "S. Pop";
-      } else if (kind === "II" || /m[aá]gic/i.test(String(varRow))) {
+        fundoRow = "LICAPA";
+        varRow = varRow || "SEKOYA POP";
+      } else if (kind === "II" || /mag/i.test(String(varRow))) {
         fundoRow = "LICAPA II";
-        varRow = varRow || "Mágica";
+        varRow = varRow || "MAGICA";
       } else if (fundo) {
-        fundoRow = fundo;
+        // Normalizar legado "LICAPA I" → "LICAPA"
+        const f = String(fundo).trim().toUpperCase();
+        fundoRow = f === "LICAPA I" || f === "LICAPA I." ? "LICAPA" : fundo;
       }
+      if (varRow) varRow = String(varRow).toUpperCase();
       out.push({
         anio,
         fecha: fechaDisplay(fecha),

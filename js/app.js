@@ -129,6 +129,16 @@ QB.App = (() => {
     return stack;
   }
 
+  /** Variedad siempre visible en MAYÚSCULAS (SEKOYA POP / MAGICA) */
+  function variedadTxt_(raw) {
+    if (!raw) return "";
+    if (QB.Data?.mapVariedad) {
+      const m = QB.Data.mapVariedad(raw);
+      if (m) return String(m).toUpperCase();
+    }
+    return String(raw).trim().toUpperCase();
+  }
+
   function toast(msg, type = "ok") {
     const stack = ensureToastStack();
     stack.querySelectorAll(".qb-toast-item").forEach((el) => {
@@ -678,7 +688,7 @@ QB.App = (() => {
     const evalDef = QB.EVALS[last.type];
     const title = evalDef ? evalDef.title : last.type || "—";
     const who = personDisplay(last.cosechador || last.evaluador || "—");
-    const variedad = last.variedad || "";
+    const variedad = variedadTxt_(last.variedad || "");
     const time = last.at
       ? new Date(last.at).toLocaleTimeString("es-PE", {
           timeZone: "America/Lima",
@@ -1347,7 +1357,7 @@ QB.App = (() => {
         <div class="upload-card-body">
           <div class="upload-card-info">
             <strong>${escapeHtml(who)}</strong>
-            <p>${escapeHtml(item.variedad || "—")} · ${escapeHtml(fecha)}${hora ? ` · ${escapeHtml(hora)}` : ""}</p>
+            <p>${escapeHtml(variedadTxt_(item.variedad) || "—")} · ${escapeHtml(fecha)}${hora ? ` · ${escapeHtml(hora)}` : ""}</p>
           </div>
           <div class="upload-card-score">
             <span class="big">${escapeHtml(loteBig)}</span>
@@ -2099,7 +2109,15 @@ QB.App = (() => {
       if (L) loteShown = aforoLoteDisplay_(L, L.lote);
       else if (row.lote) loteShown = aforoLoteDisplay_(null, row.lote);
     }
-    const turnoShown = row.turno ? `Turno ${row.turno}` : "";
+    const turnoVar =
+      row.turno && QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
+        ? QB.VALVULAR.variedadFor(row.modulo, row.turno)
+        : "";
+    const turnoShown = row.turno
+      ? turnoVar
+        ? `Turno ${row.turno} · ${turnoVar}`
+        : `Turno ${row.turno}`
+      : "";
     const valvula =
       row.valvula ||
       (QB.VALVULAR
@@ -2189,31 +2207,38 @@ QB.App = (() => {
   }
 
   function aforoLotesFiltrados_(modulo, turno, query) {
-    const allowed = QB.VALVULAR ? QB.VALVULAR.lotesFor(modulo, turno) : [];
+    // Solo turnos válidos de aforo (ej. M6: 2/4 Sekoya + 8/10 Mágica)
+    if (QB.VALVULAR && typeof QB.VALVULAR.hasModTurno === "function") {
+      if (!QB.VALVULAR.hasModTurno(modulo, turno)) return [];
+    }
     let opts = QB.Data
       ? QB.Data.loteOptionsFiltered({ modulo, turno, query })
       : [];
-    if (allowed.length) {
-      const set = new Set(allowed.map(String));
-      opts = opts.filter((o) => {
-        const L = o.raw || (QB.Data?.findLote ? QB.Data.findLote(o.id) : null);
-        const n = String(L?.lote ?? "").trim();
-        return set.has(n);
-      });
-      // Si el catálogo no trae el lote, ofrecer los de la tabla de válvulas
-      if (!opts.length) {
-        opts = allowed.map((n) => ({
-          id: String(n),
-          label: aforoLoteDisplay_(null, n),
-          meta: `${modulo} · Turno ${turno}`,
-          raw: { lote: String(n), modulo, turno: String(turno), codLote: String(n) },
-        }));
-        const q = String(query || "").trim().toLowerCase();
-        if (q) {
-          opts = opts.filter(
-            (o) => o.id.includes(q) || o.label.toLowerCase().includes(q)
-          );
-        }
+    // Si el catálogo aún no tiene esos lotes, ofrecer la válvula de referencia
+    if (!opts.length && QB.VALVULAR) {
+      const allowed = QB.VALVULAR.lotesFor(modulo, turno) || [];
+      const varLabel =
+        typeof QB.VALVULAR.variedadFor === "function"
+          ? QB.VALVULAR.variedadFor(modulo, turno)
+          : "";
+      opts = allowed.map((n) => ({
+        id: String(n),
+        label: aforoLoteDisplay_(null, n),
+        meta: [varLabel, modulo, `Turno ${turno}`].filter(Boolean).join(" · "),
+        raw: {
+          lote: String(n),
+          modulo,
+          turno: String(turno),
+          codLote: String(n),
+          variedad: varLabel,
+          etapa: /mag/i.test(varLabel) ? "Licapa II" : "Licapa I",
+        },
+      }));
+      const q = String(query || "").trim().toLowerCase();
+      if (q) {
+        opts = opts.filter(
+          (o) => o.id.includes(q) || o.label.toLowerCase().includes(q)
+        );
       }
     }
     return opts;
@@ -2275,8 +2300,27 @@ QB.App = (() => {
           : QB.Data?.turnoOptions?.(mod, q) || [];
       },
       storeValue: (opt) => String(opt?.id || ""),
-      resolveOption: (val) => (val ? { id: val, label: `Turno ${val}` } : null),
-      formatValue: (_opt, val) => (val ? `Turno ${val}` : ""),
+      resolveOption: (val) => {
+        if (!val) return null;
+        const mod = readMod();
+        const varLabel =
+          QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
+            ? QB.VALVULAR.variedadFor(mod, val)
+            : "";
+        return {
+          id: val,
+          label: varLabel ? `Turno ${val} · ${varLabel}` : `Turno ${val}`,
+        };
+      },
+      formatValue: (_opt, val) => {
+        if (!val) return "";
+        const mod = readMod();
+        const varLabel =
+          QB.VALVULAR && typeof QB.VALVULAR.variedadFor === "function"
+            ? QB.VALVULAR.variedadFor(mod, val)
+            : "";
+        return varLabel ? `Turno ${val} · ${varLabel}` : `Turno ${val}`;
+      },
       onChange: () => {
         // Al cambiar turno: limpiar lote, válvula y volúmenes
         clearAforoHidden_(block, "lote", idx, "Seleccionar...");
@@ -2742,7 +2786,16 @@ QB.App = (() => {
           mergeOpts(
             QB.API?.customValueOptions?.("variedad", q) || [],
             filterCatalog(QB.CATALOG.variedades, q)
-          ),
+          ).map((o) => ({
+            ...o,
+            id: variedadTxt_(o.id || o.label),
+            label: variedadTxt_(o.label || o.id),
+          })),
+        formatValue: (_opt, val) => variedadTxt_(val),
+        resolveOption: (val) =>
+          val
+            ? { id: variedadTxt_(val), label: variedadTxt_(val) }
+            : null,
       },
       area: {
         title: "Elegir área",
@@ -3237,7 +3290,7 @@ QB.App = (() => {
           d.supervisor ? ["Supervisor", personDisplay(d.supervisor)] : null,
           d.cosechador ? ["Cosechador", personDisplay(d.cosechador)] : null,
           ["Fecha y hora", nowStamp()],
-          d.variedad ? ["Variedad", d.variedad] : null,
+          d.variedad ? ["Variedad", variedadTxt_(d.variedad)] : null,
           (d.lote || d.modulo || d.turno)
             ? [
                 "Lote · Módulo · Turno",
@@ -3464,7 +3517,7 @@ QB.App = (() => {
                   <span class="aforo-resumen-n">${String(i + 1).padStart(2, "0")}</span>
                   <div class="aforo-resumen-block-titles">
                     <span class="aforo-resumen-form">${escapeHtml(formTag)}</span>
-                    <span class="aforo-resumen-sub">${escapeHtml(r.fundo || "—")} · ${escapeHtml(r.variedad || "—")}</span>
+                    <span class="aforo-resumen-sub">${escapeHtml(r.fundo || "—")} · ${escapeHtml(variedadTxt_(r.variedad) || "—")}</span>
                   </div>
                 </div>
                 <dl class="aforo-resumen-dl">

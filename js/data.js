@@ -67,17 +67,19 @@ QB.Data = (() => {
     }
   }
 
+  /** Valores canónicos en MAYÚSCULAS (UI + envío) */
   const VARIEDAD_MAP = {
-    "SEKOYA POP": "S. Pop",
-    "S. POP": "S. Pop",
-    "S. Pop": "S. Pop",
-    "Sekoya Pop": "S. Pop",
-    MAGICA: "Mágica",
-    "MAGICA": "Mágica",
-    "MÁGICA": "Mágica",
-    "Mágica": "Mágica",
-    Magica: "Mágica",
-    "MÃ¡gica": "Mágica",
+    "SEKOYA POP": "SEKOYA POP",
+    "S. POP": "SEKOYA POP",
+    "S. Pop": "SEKOYA POP",
+    "Sekoya Pop": "SEKOYA POP",
+    SEKOYAPOP: "SEKOYA POP",
+    MAGICA: "MAGICA",
+    "MAGICA": "MAGICA",
+    "MÁGICA": "MAGICA",
+    "Mágica": "MAGICA",
+    Magica: "MAGICA",
+    "MÃ¡gica": "MAGICA",
   };
 
   function etapaKind(etapa) {
@@ -141,7 +143,7 @@ QB.Data = (() => {
     applySeed_();
 
     const fetchJson = (url, fallback) =>
-      fetch(dataUrl_(url), { cache: "no-cache" })
+      fetch(dataUrl_(url))
         .then((r) => {
           if (!r.ok) throw new Error(String(r.status));
           return r.json();
@@ -192,7 +194,13 @@ QB.Data = (() => {
   function mapVariedad(raw) {
     if (!raw) return "";
     const key = fixMojibake_(String(raw).trim());
-    return VARIEDAD_MAP[key] || VARIEDAD_MAP[key.toUpperCase()] || key;
+    const mapped =
+      VARIEDAD_MAP[key] ||
+      VARIEDAD_MAP[key.toUpperCase()] ||
+      VARIEDAD_MAP[key.replace(/\s+/g, "").toUpperCase()];
+    if (mapped) return mapped;
+    // Cualquier otra variedad: mostrar en MAYÚSCULAS
+    return key.toUpperCase();
   }
 
   /**
