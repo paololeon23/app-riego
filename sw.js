@@ -3,7 +3,7 @@
  * - Con datos móviles: NO re-descarga si ya está en caché (ahorra megas)
  * - Actualización: solo al instalar nueva versión del SW (Wi‑Fi recomendado)
  */
-const CACHE = "qb-riego-v306";
+const CACHE = "qb-riego-v307";
 const ASSETS = [
   "./",
   "./index.html",

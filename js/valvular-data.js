@@ -9,7 +9,8 @@ QB.VALVULAR = (() => {
     "M3|T1": 97, "M3|T3": 105, "M3|T5": 111, "M3|T7": 120, "M3|T9": 130,
     "M4|T2": 144, "M4|T4": 152, "M4|T6": 163, "M4|T8": 170, "M4|T10": 177,
     "M5|T1": 184, "M5|T3": 192, "M5|T9": 219,
-    "M6|T8": 260, "M6|T10": 271,
+    /* M6: T2/T4 SEKOYA POP (LICAPA) · T8/T10 MAGICA (LICAPA II) */
+    "M6|T2": 249, "M6|T4": 251, "M6|T8": 260, "M6|T10": 271,
     "M7|T1": 283, "M7|T3": 293, "M7|T5": 301, "M7|T7": 309, "M7|T9": 318,
     "M8|T2": 330, "M8|T4": 338, "M8|T6": 349, "M8|T8": 360, "M8|T10": 368,
     "M9|T1": 374, "M9|T3": 384, "M9|T5": 396, "M9|T7": 405, "M9|T9": 414,
@@ -37,7 +38,7 @@ QB.VALVULAR = (() => {
     "M3|T1": "SEKOYA POP", "M3|T3": "SEKOYA POP", "M3|T5": "SEKOYA POP", "M3|T7": "SEKOYA POP", "M3|T9": "SEKOYA POP",
     "M4|T2": "SEKOYA POP", "M4|T4": "SEKOYA POP", "M4|T6": "SEKOYA POP", "M4|T8": "SEKOYA POP", "M4|T10": "SEKOYA POP",
     "M5|T1": "SEKOYA POP", "M5|T3": "SEKOYA POP", "M5|T9": "SEKOYA POP",
-    "M6|T8": "MAGICA", "M6|T10": "MAGICA",
+    "M6|T2": "SEKOYA POP", "M6|T4": "SEKOYA POP", "M6|T8": "MAGICA", "M6|T10": "MAGICA",
     "M7|T1": "MAGICA", "M7|T3": "MAGICA", "M7|T5": "MAGICA", "M7|T7": "MAGICA", "M7|T9": "MAGICA",
     "M8|T2": "MAGICA", "M8|T4": "MAGICA", "M8|T6": "MAGICA", "M8|T8": "MAGICA", "M8|T10": "MAGICA",
     "M9|T1": "MAGICA", "M9|T3": "MAGICA", "M9|T5": "MAGICA", "M9|T7": "MAGICA", "M9|T9": "MAGICA",

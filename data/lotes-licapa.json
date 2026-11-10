@@ -200,6 +200,22 @@
     "variedad": "SEKOYA POP"
   },
   {
+    "lote": "249",
+    "modulo": "M6",
+    "turno": "2",
+    "etapa": "Licapa I",
+    "codLote": "M6T2LT249",
+    "variedad": "SEKOYA POP"
+  },
+  {
+    "lote": "251",
+    "modulo": "M6",
+    "turno": "4",
+    "etapa": "Licapa I",
+    "codLote": "M6T4LT251",
+    "variedad": "SEKOYA POP"
+  },
+  {
     "lote": "260",
     "modulo": "M6",
     "turno": "8",
